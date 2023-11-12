@@ -109,6 +109,12 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_log() {
+        let mut vm = VM::new();
+        assert_eq!(3.0, compute_expression(&mut vm, "log(1000)").unwrap().round());
+    }
+
+    #[test]
     fn can_compile_add() {
         let mut instructions = instr_iter("90 + 20").into_iter();
 

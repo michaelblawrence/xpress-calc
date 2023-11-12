@@ -11,6 +11,7 @@ pub enum Token {
     Div,
     Sine,
     Cosine,
+    Log,
     OpenParen,
     CloseParen,
     Pow,
@@ -43,6 +44,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
     *bite = bite.chomp(parser::Chomp::whitespace());
     let token = if let Some(_) = bite.nibble(parser::Chomp::literal("sin")) {
         Token::Sine
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("log")) {
+        Token::Log
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("cos")) {
         Token::Cosine
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("rand")) {
