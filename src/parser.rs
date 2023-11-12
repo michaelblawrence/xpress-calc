@@ -34,11 +34,17 @@ impl<'a> Bite<'a> {
     ) -> Option<[&'a str; N]> {
         let mut matches = [""; N];
         let mut next = *self;
-        for (chomp, nibble_match) in chomp.into_iter().zip(matches.iter_mut()) {
+        for (mut chomp, nibble_match) in chomp.into_iter().zip(matches.iter_mut()) {
             (*nibble_match, next) = chomp.matcher.consume(next).filter(|(x, _)| !x.is_empty())?;
         }
         *self = next;
         Some(matches)
+    }
+    pub fn swallow_char(&mut self) -> Option<char> {
+        let c = self.inner.chars().next()?;
+        let (_, rest) = self.inner.split_at(c.len_utf8());
+        self.inner = rest;
+        Some(c)
     }
 }
 
@@ -67,12 +73,19 @@ impl<'a> Chomp<()> {
             matcher: matchers::is_numeric,
         }
     }
-    pub fn any_number() -> Chomp<impl FnOnce(&'a str) -> Option<usize>> {
+    pub fn any_number() -> Chomp<impl FnMut(&'a str) -> Option<usize>> {
         let mut seen_dp = false;
         Chomp {
             matcher: move |x: &str| {
+                if x.split_once(|x: char| !x.is_ascii_digit() && !['.', '+', '-'].contains(&x))
+                    .map_or(false, |(x, _)| {
+                        x.len() <= 2 && !x.starts_with(|c| char::is_ascii_digit(&c))
+                    })
+                {
+                    return None;
+                }
                 matchers::matches(
-                    |x| match x {
+                    |z| match z {
                         (0, '+' | '-') => true,
                         (_, '.') if !seen_dp => {
                             seen_dp = true;
@@ -86,7 +99,7 @@ impl<'a> Chomp<()> {
             },
         }
     }
-    pub fn literal(pattern: &'a str) -> Chomp<impl FnOnce(&'a str) -> Option<usize>> {
+    pub fn literal(pattern: &'a str) -> Chomp<impl FnMut(&'a str) -> Option<usize>> {
         let mut char_indices = pattern.char_indices();
         Chomp {
             matcher: move |x: &str| {
@@ -94,37 +107,36 @@ impl<'a> Chomp<()> {
             },
         }
     }
-    pub fn char(c: char) -> Chomp<impl FnOnce(&'a str) -> Option<usize>> {
+    pub fn char(c: char) -> Chomp<impl Fn(&'a str) -> Option<usize>> {
         Chomp {
             matcher: move |x: &str| matchers::char_matches(move |(_, x)| *x == c, x),
         }
     }
-    pub fn char_any(c: &'a [char]) -> Chomp<impl FnOnce(&'a str) -> Option<usize>> {
+    pub fn char_any(c: &'a [char]) -> Chomp<impl Fn(&'a str) -> Option<usize>> {
         Chomp {
             matcher: move |x: &str| matchers::char_matches(move |(_, x)| c.contains(x), x),
         }
     }
 }
 
-impl<'a, M: FnOnce(&'a str) -> Option<usize>> Chomp<M> {
-    pub fn or(
-        self,
-        other: Chomp<impl FnOnce(&'a str) -> Option<usize>>,
-    ) -> Chomp<impl FnOnce(&'a str) -> Option<usize>> {
-        Chomp {
-            matcher: move |x: &'a str| ((self.matcher)(x).or_else(move || (other.matcher)(x))),
-        }
-    }
-}
+impl<'a, M: FnOnce(&'a str) -> Option<usize>> Chomp<M> {}
 
 impl<'a, M: ChompMatcher<'a>> Chomp<M> {
     pub fn new(matcher: M) -> Self {
         Self { matcher }
     }
-    pub fn consume(self, bite: Bite<'a>) -> (Option<&'a str>, Bite<'a>) {
+    pub fn consume(mut self, bite: Bite<'a>) -> (Option<&'a str>, Bite<'a>) {
         let consume = self.matcher.consume(bite);
         let map = consume.map(|(matched, bite)| (Some(matched), bite));
         map.unwrap_or((None, bite))
+    }
+    pub fn or<T>(self, other: Chomp<T>) -> Chomp<matchers::combine::Or<M, T>>
+    where
+        T: ChompMatcher<'a>,
+    {
+        Chomp {
+            matcher: matchers::combine::Or::new(self.matcher, other.matcher),
+        }
     }
 }
 
@@ -154,17 +166,46 @@ mod matchers {
             _ => None,
         }
     }
+
+    pub mod combine {
+        use crate::parser::{Bite, ChompMatcher};
+
+        pub struct Or<T1, T2>(T1, T2);
+
+        impl<'a, T1: ChompMatcher<'a>, T2: ChompMatcher<'a>> Or<T1, T2> {
+            pub fn new(first: T1, second: T2) -> Self {
+                Self(first, second)
+            }
+        }
+
+        impl<'a, T1, T2> ChompMatcher<'a> for Or<T1, T2>
+        where
+            T1: ChompMatcher<'a>,
+            T2: ChompMatcher<'a>,
+        {
+            fn consume(&mut self, bite: Bite<'a>) -> Option<(&'a str, Bite<'a>)> {
+                self.0.consume(bite).or_else(move || self.1.consume(bite))
+            }
+        }
+    }
 }
 
 pub trait ChompMatcher<'a> {
-    fn consume(self, bite: Bite<'a>) -> Option<(&'a str, Bite<'a>)>;
+    fn consume(&mut self, bite: Bite<'a>) -> Option<(&'a str, Bite<'a>)>;
+    fn consume_char(&mut self, bite: Bite<'a>) -> Option<(char, Bite<'a>)> {
+        self.consume(bite)
+            .filter(|(matched, _)| !matched.is_empty())?;
+        let mut bite = bite.clone();
+        let c = bite.swallow_char()?;
+        Some((c, bite))
+    }
 }
 
 impl<'a, T> ChompMatcher<'a> for T
 where
-    T: FnOnce(&'a str) -> Option<usize>,
+    T: FnMut(&'a str) -> Option<usize>,
 {
-    fn consume(self, bite: Bite<'a>) -> Option<(&'a str, Bite<'a>)> {
+    fn consume(&mut self, bite: Bite<'a>) -> Option<(&'a str, Bite<'a>)> {
         let mid = self(bite.inner)?;
         let (matched, remaining) = bite.inner.split_at(mid);
         Some((matched, Bite::new(remaining)))
