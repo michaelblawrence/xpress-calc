@@ -167,6 +167,13 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_pow() {
+        let mut vm = VM::new();
+        assert_eq!(9.0, compute_expression(&mut vm, "3 ^ 2").unwrap().round());
+        assert_eq!(1024.0, compute_expression(&mut vm, "2^10").unwrap().round());
+    }
+
+    #[test]
     fn can_compile_multiple() {
         let mut instructions = instr_iter("3 - sin(90)").into_iter();
 

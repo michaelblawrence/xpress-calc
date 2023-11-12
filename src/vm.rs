@@ -13,6 +13,7 @@ pub enum Instruction {
     Mul,
     Mod,
     Div,
+    Pow,
 }
 
 #[derive(Debug, Default)]
@@ -40,6 +41,7 @@ impl VM {
                 Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs),
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs),
                 Instruction::Mod => self.binary_op(|lhs, rhs| lhs % rhs),
+                Instruction::Pow => self.binary_op(|lhs, rhs| lhs.powf(rhs)),
             }
         }
 

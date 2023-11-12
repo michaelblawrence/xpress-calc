@@ -22,6 +22,7 @@ enum BinaryOp {
     Div,
     Mul,
     Mod,
+    Pow,
 }
 #[derive(Debug)]
 enum Func0Op {
@@ -65,6 +66,7 @@ impl<'a> RecursiveCompiler<'a> {
                         BinaryOp::Div => stream.push(Instruction::Div),
                         BinaryOp::Mul => stream.push(Instruction::Mul),
                         BinaryOp::Mod => stream.push(Instruction::Mod),
+                        BinaryOp::Pow => stream.push(Instruction::Pow),
                     }
                 }
                 RecursiveExpression::Func0(op) => match op {
@@ -98,9 +100,10 @@ impl<'a> RecursiveCompiler<'a> {
         };
 
         match (expression, self.peek()) {
-            (Some(lhs), Some(Token::Plus | Token::Sub | Token::Mul | Token::Div | Token::Mod)) => {
-                self.compile_binary_op(lhs)
-            }
+            (
+                Some(lhs),
+                Some(Token::Plus | Token::Sub | Token::Mul | Token::Div | Token::Mod | Token::Pow),
+            ) => self.compile_binary_op(lhs),
             (expression, _) => expression,
         }
     }
@@ -188,6 +191,7 @@ impl<'a> RecursiveCompiler<'a> {
             Token::Mul => Some(BinaryOp::Mul),
             Token::Div => Some(BinaryOp::Div),
             Token::Mod => Some(BinaryOp::Mod),
+            Token::Pow => Some(BinaryOp::Pow),
             _ => None,
         }?;
         self.consume()?;
