@@ -6,9 +6,8 @@ pub enum Instruction {
     Cosine,
     Push(f64),
     Mul,
+    Mod,
     Div,
-    Routine(Option<Box<Instruction>>, Vec<Instruction>),
-    Noop,
 }
 
 #[derive(Debug, Default)]
@@ -30,16 +29,7 @@ impl VM {
                 Instruction::Push(x) => self.push(*x),
                 Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs),
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs),
-                Instruction::Routine(None, routine) => self.run(&routine)?,
-                Instruction::Routine(Some(root), routine) => self.run(&{
-                    let mut v = Vec::with_capacity(routine.len() + 1);
-                    v.push(*root.clone());
-                    for item in routine {
-                        v.push(item.clone());
-                    }
-                    v
-                })?,
-                Instruction::Noop => {}
+                Instruction::Mod => self.binary_op(|lhs, rhs| lhs % rhs),
             }
         }
 

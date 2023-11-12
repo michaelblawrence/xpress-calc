@@ -2,7 +2,7 @@ use std::{fmt::Display, str::FromStr};
 
 use crate::parser;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Token {
     LiteralNum(f64),
     Plus,
@@ -15,7 +15,6 @@ pub enum Token {
     CloseParen,
     Pow,
     Mod,
-    EOF,
 }
 
 pub fn tokenize_iter<'a>(

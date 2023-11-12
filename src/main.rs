@@ -1,4 +1,4 @@
-use compiler::Compiler;
+use compiler::RecursiveCompiler;
 use vm::VM;
 
 mod compiler;
@@ -27,14 +27,15 @@ fn compute_expression(input: &str) -> Option<f64> {
         }
     });
 
-    let mut compiler = Compiler::default();
-    let stream = compiler.iter(token_iter);
-
-    let mut program = vec![];
-    for instr in stream {
-        println!("INFO: next instr: {instr:?}");
-        program.push(instr);
-    }
+    let tokens = token_iter.collect::<Vec<_>>();
+    let mut compiler = RecursiveCompiler::new(&tokens);
+    let program = match compiler.compile() {
+        Ok(x) => x,
+        Err(err) => {
+            eprintln!("ERROR: could not compile program: {err}");
+            std::process::exit(1);
+        }
+    };
 
     let mut vm = VM::new();
     match vm.run(&program) {
@@ -57,7 +58,7 @@ fn read_line() -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::{compiler::Compiler, tokenizer::Token, vm::Instruction};
+    use crate::{tokenizer::Token, vm::Instruction};
 
     use super::*;
 
@@ -89,7 +90,10 @@ mod tests {
         assert_eq!(-1.0, compute_expression("sin(270)").unwrap().round());
 
         assert_eq!(0.0, compute_expression("sin(90 + 90)").unwrap().round());
-        assert_eq!(2.0, compute_expression("sin(90) + sin(90)").unwrap().round());
+        assert_eq!(
+            2.0,
+            compute_expression("sin(90) + sin(90)").unwrap().round()
+        );
     }
 
     #[test]
@@ -131,8 +135,7 @@ mod tests {
 
     #[test]
     fn can_compile_multiple() {
-        let (instructions, _compiler) = compile_impl("3 - sin(90)");
-        let mut instructions = instructions.into_iter();
+        let mut instructions = instr_iter("3 - sin(90)").into_iter();
 
         assert_eq!(Some(Instruction::Push(3.0)), instructions.next());
         assert_eq!(Some(Instruction::Push(90.0)), instructions.next());
@@ -165,17 +168,12 @@ mod tests {
     }
 
     fn instr_iter(input: &str) -> Vec<Instruction> {
-        compile_impl(input).0
-    }
-
-    fn compile_impl(input: &str) -> (Vec<Instruction>, Compiler) {
         let tokens: Result<Vec<_>, _> = tokenizer::tokenize_iter(input.into()).collect();
         let tokens = dbg!(tokens.unwrap());
 
-        let mut compiler = Compiler::default();
-        let instructions = compiler.iter(tokens.into_iter()).collect();
-
-        (instructions, compiler)
+        let mut compiler = RecursiveCompiler::new(&tokens);
+        let instructions = compiler.compile().expect("failed compile");
+        instructions
     }
 
     #[test]

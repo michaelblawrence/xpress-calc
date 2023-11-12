@@ -1,277 +1,157 @@
 use crate::{tokenizer::Token, vm::Instruction};
 
+
+#[derive(Default)]
+pub struct RecursiveCompiler<'a> {
+    position: usize,
+    program: &'a [Token],
+}
+
 #[derive(Debug)]
-pub enum InstructionStreamItem {
-    Single(Instruction),
-    Double(Instruction, Instruction),
-    Many(Vec<Instruction>),
-    Skip,
-    Err(String),
+enum RecursiveExpression {
+    Literal(f64),
+    BinaryOp(Box<RecursiveExpression>, BinaryOp, Box<RecursiveExpression>),
+    Func(FuncOp, Box<RecursiveExpression>),
+}
+#[derive(Debug)]
+enum BinaryOp {
+    Add,
+    Sub,
+    Div,
+    Mul,
+    Mod,
+}
+#[derive(Debug)]
+enum FuncOp {
+    Sin,
+    Cos,
 }
 
-#[derive(Default)]
-enum State {
-    #[default]
-    Empty,
-    ExpectOpen,
-    ExpectClose(InstructionStreamItem),
-}
-
-#[derive(Default)]
-pub struct Compiler {
-    stack: Stack,
-    state: State,
-}
-
-impl Compiler {
-    pub fn iter<'a>(
-        &'a mut self,
-        tokens: impl Iterator<Item = Token> + 'a,
-    ) -> impl Iterator<Item = Instruction> + 'a {
-        enum IterState {
-            Empty,
-            Single(Instruction),
-            Multi(Vec<Instruction>, usize),
+impl<'a> RecursiveCompiler<'a> {
+    pub fn new(program: &'a [Token]) -> Self {
+        Self {
+            position: Default::default(),
+            program: program,
         }
-
-        let mut tokens = tokens.into_iter().chain(std::iter::once(Token::EOF));
-        let mut current = IterState::Empty;
-        let mut done = false;
-
-        std::iter::from_fn(move || {
-            match &mut current {
-                IterState::Multi(many, idx) => {
-                    if *idx >= many.len() {
-                        current = IterState::Empty;
-                    } else {
-                        let next = many.get(*idx).cloned();
-                        *idx += 1;
-                        return next;
-                    }
-                }
-                IterState::Single(next) => {
-                    let next = next.clone();
-                    current = IterState::Empty;
-                    return Some(next);
-                }
-                IterState::Empty => (),
-            }
-
-            if done {
-                return None;
-            }
-
-            while let Some(token) = tokens.next() {
-                if matches!(token, Token::EOF) {
-                    done = true;
-                }
-                match self.next_impl(token) {
-                    InstructionStreamItem::Single(single) => return Some(single),
-                    InstructionStreamItem::Double(first, second) => {
-                        current = IterState::Single(second);
-                        return Some(first);
-                    }
-                    InstructionStreamItem::Many(many) => {
-                        let first = many.first().cloned();
-                        current = IterState::Multi(many, 1);
-                        return first;
-                    }
-                    InstructionStreamItem::Skip => continue,
-                    InstructionStreamItem::Err(err) => {
-                        panic!("Error processing instruction stream {err}");
-                    }
-                }
-            }
-
-            None
-        })
-        .filter(|x| !matches!(x, Instruction::Noop))
     }
 
-    fn next_impl<'a>(&'a mut self, token: Token) -> InstructionStreamItem {
-        let next = match std::mem::replace(&mut self.state, State::Empty) {
-            State::ExpectOpen => match token {
-                Token::OpenParen => InstructionStreamItem::Skip,
-                _ => InstructionStreamItem::Err("Expected '('".into()),
-            },
-            State::ExpectClose(item) => match token {
-                Token::CloseParen => item,
-                _ => InstructionStreamItem::Err("Expected ')'".into()),
-            },
-            State::Empty => match token {
-                Token::LiteralNum(x) => Self::pop_stack(
-                    Instruction::Push(x as f64),
-                    &mut self.stack,
-                    &mut self.state,
-                ),
-                Token::Plus => {
-                    self.stack.push(Instruction::Add);
-                    InstructionStreamItem::Skip
-                }
-                Token::Sub => {
-                    self.stack.push(Instruction::Sub);
-                    InstructionStreamItem::Skip
-                }
-                Token::Mul => {
-                    self.stack.push(Instruction::Mul);
-                    InstructionStreamItem::Skip
-                }
-                Token::Div => {
-                    self.stack.push(Instruction::Div);
-                    InstructionStreamItem::Skip
-                }
-                Token::Sine => {
-                    self.stack.push(Instruction::Routine(
-                        Some(Box::new(Instruction::Sine)),
-                        vec![],
-                    ));
-                    self.state = State::ExpectOpen;
-                    InstructionStreamItem::Skip
-                }
-                Token::Cosine => {
-                    self.stack.push(Instruction::Routine(
-                        Some(Box::new(Instruction::Cosine)),
-                        vec![],
-                    ));
-                    self.state = State::ExpectOpen;
-                    InstructionStreamItem::Skip
-                }
-                Token::OpenParen => {
-                    self.stack.push(Instruction::Routine(None, vec![]));
-                    InstructionStreamItem::Skip
-                }
-                Token::CloseParen => {
-                    if matches!(self.stack.last(), Some(Instruction::Routine(_, _))) {
-                        Self::pop_stack(Instruction::Noop, &mut self.stack, &mut self.state);
-                        match self.stack.pop() {
-                            Some(Instruction::Routine(Some(root), mut many)) => {
-                                many.push(*root);
-                                InstructionStreamItem::Many(many)
-                            }
-                            Some(Instruction::Routine(None, many)) => {
-                                InstructionStreamItem::Many(many)
-                            }
-                            _ => unreachable!(),
-                        }
-                    } else {
-                        InstructionStreamItem::Err("Unexpected ')'".into())
+    pub fn compile(&mut self) -> Result<Vec<Instruction>, String> {
+        let program_expression = self
+            .compile_expression()
+            .ok_or_else(|| format!("empty program expression!"))?;
+
+        fn delve(node: &RecursiveExpression, stream: &mut Vec<Instruction>) {
+            match node {
+                RecursiveExpression::Literal(x) => stream.push(Instruction::Push(*x)),
+                RecursiveExpression::BinaryOp(lhs, op, rhs) => {
+                    delve(lhs, stream);
+                    delve(rhs, stream);
+                    match op {
+                        BinaryOp::Add => stream.push(Instruction::Add),
+                        BinaryOp::Sub => stream.push(Instruction::Sub),
+                        BinaryOp::Div => stream.push(Instruction::Div),
+                        BinaryOp::Mul => stream.push(Instruction::Mul),
+                        BinaryOp::Mod => stream.push(Instruction::Mod),
                     }
                 }
-                Token::Pow => todo!(),
-                Token::Mod => todo!(),
-                Token::EOF => Self::pop_stack(Instruction::Noop, &mut self.stack, &mut self.state),
-            },
+                RecursiveExpression::Func(op, value) => {
+                    delve(value, stream);
+                    match op {
+                        FuncOp::Sin => stream.push(Instruction::Sine),
+                        FuncOp::Cos => stream.push(Instruction::Cosine),
+                    }
+                }
+            }
+        }
+
+        let mut instruction_stream = vec![];
+
+        delve(&program_expression, &mut instruction_stream);
+
+        Ok(instruction_stream)
+    }
+
+    fn compile_expression(&mut self) -> Option<RecursiveExpression> {
+        let expression = match self.peek() {
+            Some(Token::Sine | Token::Cosine) => self.compile_func_like(),
+            Some(Token::OpenParen) => self.compile_parens_expression(),
+            Some(Token::LiteralNum(_)) => self.compile_literal_expression(),
+            _ => None,
         };
 
-        match next {
-            InstructionStreamItem::Single(next) => match self.stack.try_add(next) {
-                Ok(()) => InstructionStreamItem::Skip,
-                Err(next) => InstructionStreamItem::Single(next),
-            },
-            InstructionStreamItem::Double(first, second) => {
-                match self.stack.try_add_many([first, second].into_iter()) {
-                    Ok(()) => InstructionStreamItem::Skip,
-                    Err(next) => InstructionStreamItem::Many(next),
-                }
+        match (expression, self.peek()) {
+            (Some(lhs), Some(Token::Plus | Token::Sub | Token::Mul | Token::Div | Token::Mod)) => {
+                self.compile_binary_op(lhs)
             }
-            InstructionStreamItem::Many(next) => match self.stack.try_add_many(next.into_iter()) {
-                Ok(()) => InstructionStreamItem::Skip,
-                Err(next) => InstructionStreamItem::Many(next),
-            },
-            next => next,
+            (expression, _) => expression,
         }
     }
 
-    fn pop_stack(
-        instr: Instruction,
-        stack: &mut Stack,
-        state: &mut State,
-    ) -> InstructionStreamItem {
-        if let Some(Instruction::Routine(_, many)) = stack.last_mut() {
-            many.push(instr);
-            return InstructionStreamItem::Skip;
-        }
-        match stack.pop() {
-            Some(Instruction::Sine) => {
-                *state =
-                    State::ExpectClose(InstructionStreamItem::Double(instr, Instruction::Sine));
-                InstructionStreamItem::Skip
+    fn compile_literal_expression(&mut self) -> Option<RecursiveExpression> {
+        match *self.peek()? {
+            Token::LiteralNum(x) => {
+                self.consume();
+                Some(RecursiveExpression::Literal(x))
             }
-            Some(Instruction::Cosine) => {
-                *state =
-                    State::ExpectClose(InstructionStreamItem::Double(instr, Instruction::Cosine));
-                InstructionStreamItem::Skip
-            }
-            Some(Instruction::Add) => InstructionStreamItem::Double(instr, Instruction::Add),
-            Some(Instruction::Sub) => InstructionStreamItem::Double(instr, Instruction::Sub),
-            Some(Instruction::Mul) => InstructionStreamItem::Double(instr, Instruction::Mul),
-            Some(Instruction::Div) => InstructionStreamItem::Double(instr, Instruction::Div),
-            None => InstructionStreamItem::Single(instr),
-
-            Some(Instruction::Routine(_, _)) => unreachable!(),
-            Some(Instruction::Noop) => unreachable!(),
-            Some(Instruction::Push(_)) => unreachable!(),
+            _ => None,
         }
     }
-}
 
-#[derive(Default)]
-struct Stack(Vec<Instruction>);
-
-impl Stack {
-    pub fn push(&mut self, value: Instruction) {
-        self.0.push(value)
+    fn compile_parens_expression(&mut self) -> Option<RecursiveExpression> {
+        self.try_consume(&Token::OpenParen)?;
+        let expression = self.compile_expression()?;
+        self.try_consume(&Token::CloseParen)?;
+        Some(expression)
     }
 
-    pub fn pop(&mut self) -> Option<Instruction> {
-        self.0.pop()
+    fn compile_func_like(&mut self) -> Option<RecursiveExpression> {
+        let func_op = match self.peek()? {
+            Token::Sine => Some(FuncOp::Sin),
+            Token::Cosine => Some(FuncOp::Cos),
+            _ => None,
+        }?;
+        self.consume()?;
+        self.try_consume(&Token::OpenParen)?;
+        let expression = self.compile_expression()?;
+        self.try_consume(&Token::CloseParen)?;
+        Some(RecursiveExpression::Func(func_op, Box::new(expression)))
     }
 
-    pub fn last(&self) -> Option<&Instruction> {
-        self.0.last()
+    fn compile_binary_op(&mut self, lhs: RecursiveExpression) -> Option<RecursiveExpression> {
+        let binary_op = match self.peek()? {
+            Token::Plus => Some(BinaryOp::Add),
+            Token::Sub => Some(BinaryOp::Sub),
+            Token::Mul => Some(BinaryOp::Mul),
+            Token::Div => Some(BinaryOp::Div),
+            Token::Mod => Some(BinaryOp::Mod),
+            _ => None,
+        }?;
+        self.consume()?;
+        let rhs = self.compile_expression()?;
+        Some(RecursiveExpression::BinaryOp(
+            Box::new(lhs),
+            binary_op,
+            Box::new(rhs),
+        ))
     }
 
-    pub fn last_mut(&mut self) -> Option<&mut Instruction> {
-        self.0.last_mut()
+    fn peek(&self) -> Option<&Token> {
+        self.program.get(self.position)
     }
 
-    pub fn try_add(&mut self, value: Instruction) -> Result<(), Instruction> {
-        self.try_add_many(std::iter::once(value))
-            .map_err(|x| x.into_iter().next().unwrap())
+    fn consume(&mut self) -> Option<&Token> {
+        let token = self.program.get(self.position);
+        self.position += 1;
+        token
     }
 
-    pub fn try_add_many(
-        &mut self,
-        value: impl Iterator<Item = Instruction>,
-    ) -> Result<(), Vec<Instruction>> {
-        fn inner_impl(
-            inner: &mut Vec<Instruction>,
-            value: impl Iterator<Item = Instruction>,
-            level: usize,
-        ) -> Result<(), Vec<Instruction>> {
-            let routine = inner
-                .iter_mut()
-                .rfind(|x| matches!(x, Instruction::Routine(_, _)));
-
-            match (level, routine) {
-                (0, Some(Instruction::Routine(_, many))) => {
-                    for item in value {
-                        many.push(item);
-                    }
-                    Ok(())
-                }
-                (level, Some(Instruction::Routine(_, many))) => inner_impl(many, value, level + 1),
-                (level, _) if level > 0 => {
-                    for item in value {
-                        inner.push(item);
-                    }
-                    Ok(())
-                }
-                _ => Err(value.collect()),
-            }
+    fn try_consume(&mut self, token: &Token) -> Option<&Token> {
+        let next_token = self.program.get(self.position)?;
+        if token == next_token {
+            self.position += 1;
+            Some(next_token)
+        } else {
+            None
         }
-
-        let inner = &mut self.0;
-        inner_impl(inner, value, 0)
     }
 }
