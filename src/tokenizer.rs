@@ -42,7 +42,7 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Sine
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("cos")) {
         Token::Cosine
-    } else if let Some(literal) = bite.nibble(parser::Chomp::numeric()) {
+    } else if let Some(literal) = bite.nibble(parser::Chomp::any_number()) {
         Token::LiteralNum(parse(literal)?)
     } else if let Some(_) = bite.nibble(parser::Chomp::char('(')) {
         Token::OpenParen
