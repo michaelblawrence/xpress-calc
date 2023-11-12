@@ -89,6 +89,7 @@ mod tests {
         assert_eq!(-1.0, compute_expression("sin(270)").unwrap().round());
 
         assert_eq!(0.0, compute_expression("sin(90 + 90)").unwrap().round());
+        assert_eq!(2.0, compute_expression("sin(90) + sin(90)").unwrap().round());
     }
 
     #[test]
