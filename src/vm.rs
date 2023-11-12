@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
     Add,
@@ -5,6 +7,7 @@ pub enum Instruction {
     Sine,
     Cosine,
     Push(f64),
+    PushRandom,
     Mul,
     Mod,
     Div,
@@ -13,6 +16,7 @@ pub enum Instruction {
 #[derive(Debug, Default)]
 pub struct VM {
     stack: Vec<f64>,
+    rng: Rand,
 }
 
 impl VM {
@@ -27,6 +31,7 @@ impl VM {
                 Instruction::Sine => self.uanry_op(|x| x.to_radians().sin()),
                 Instruction::Cosine => self.uanry_op(|x| x.to_radians().cos()),
                 Instruction::Push(x) => self.push(*x),
+                Instruction::PushRandom => self.push(self.rng.rand()),
                 Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs),
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs),
                 Instruction::Mod => self.binary_op(|lhs, rhs| lhs % rhs),
@@ -35,9 +40,9 @@ impl VM {
 
         Ok(())
     }
-    pub fn result(&self) -> Option<f64> {
-        match &self.stack[..] {
-            &[result] => Some(result),
+    pub fn result(&mut self) -> Option<f64> {
+        match self.stack.pop() {
+            Some(result) => Some(result),
             _ => {
                 dbg!(self);
                 None
@@ -59,5 +64,26 @@ impl VM {
 
     fn push(&mut self, x: f64) {
         self.stack.push(x);
+    }
+}
+
+pub struct Rand(RefCell<tiny_rng::Rng>);
+
+impl Rand {
+    fn rand(&self) -> f64 {
+        use tiny_rng::Rand;
+        self.0.borrow_mut().rand_f64()
+    }
+}
+
+impl Default for Rand {
+    fn default() -> Self {
+        Self(RefCell::new(tiny_rng::Rand::from_seed(0)))
+    }
+}
+
+impl std::fmt::Debug for Rand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Rand").finish()
     }
 }

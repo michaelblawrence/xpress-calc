@@ -7,17 +7,18 @@ mod tokenizer;
 mod vm;
 
 fn main() {
+    let mut vm = VM::new();
     loop {
         print!("Enter expression (example: '5 + 2'): ");
         let expression = read_line();
-        match compute_expression(&expression) {
+        match compute_expression(&mut vm, &expression) {
             Some(result) => println!("result = {result}"),
             None => println!("result = undefined"),
         }
     }
 }
 
-fn compute_expression(input: &str) -> Option<f64> {
+fn compute_expression(vm: &mut VM, input: &str) -> Option<f64> {
     let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
     let token_iter = tokenizer::tokenize_iter(source).map(|x| match x {
         Ok(x) => x,
@@ -37,7 +38,6 @@ fn compute_expression(input: &str) -> Option<f64> {
         }
     };
 
-    let mut vm = VM::new();
     match vm.run(&program) {
         Ok(_) => {}
         Err(err) => {
@@ -84,15 +84,27 @@ mod tests {
 
     #[test]
     fn can_compute_sin() {
-        assert_eq!(0.0, compute_expression("sin(0)").unwrap().round());
-        assert_eq!(1.0, compute_expression("sin(90)").unwrap().round());
-        assert_eq!(0.0, compute_expression("sin(180)").unwrap().round());
-        assert_eq!(-1.0, compute_expression("sin(270)").unwrap().round());
+        let mut vm = VM::new();
+        assert_eq!(0.0, compute_expression(&mut vm, "sin(0)").unwrap().round());
+        assert_eq!(1.0, compute_expression(&mut vm, "sin(90)").unwrap().round());
+        assert_eq!(
+            0.0,
+            compute_expression(&mut vm, "sin(180)").unwrap().round()
+        );
+        assert_eq!(
+            -1.0,
+            compute_expression(&mut vm, "sin(270)").unwrap().round()
+        );
 
-        assert_eq!(0.0, compute_expression("sin(90 + 90)").unwrap().round());
+        assert_eq!(
+            0.0,
+            compute_expression(&mut vm, "sin(90 + 90)").unwrap().round()
+        );
         assert_eq!(
             2.0,
-            compute_expression("sin(90) + sin(90)").unwrap().round()
+            compute_expression(&mut vm, "sin(90) + sin(90)")
+                .unwrap()
+                .round()
         );
     }
 
@@ -104,17 +116,34 @@ mod tests {
         assert_eq!(Some(Instruction::Push(20.0)), instructions.next());
         assert_eq!(Some(Instruction::Add), instructions.next());
         assert_eq!(None, instructions.next());
+
+        let mut instructions = instr_iter("3+2").into_iter();
+
+        assert_eq!(Some(Instruction::Push(3.0)), instructions.next());
+        assert_eq!(Some(Instruction::Push(2.0)), instructions.next());
+        assert_eq!(Some(Instruction::Add), instructions.next());
+        assert_eq!(None, instructions.next());
     }
 
     #[test]
     fn can_compute_add() {
-        assert_eq!(110.0, compute_expression("90 + 20").unwrap().round());
-        assert_eq!(3.0, compute_expression("1 + 2").unwrap().round());
+        let mut vm = VM::new();
+        assert_eq!(
+            110.0,
+            compute_expression(&mut vm, "90 + 20").unwrap().round()
+        );
+        assert_eq!(3.0, compute_expression(&mut vm, "1 + 2").unwrap().round());
     }
 
     #[test]
     fn can_compute_add_brackets() {
-        assert_eq!(3.0, compute_expression("(1) + (1) + (1)").unwrap().round());
+        let mut vm = VM::new();
+        assert_eq!(
+            3.0,
+            compute_expression(&mut vm, "(1) + (1) + (1)")
+                .unwrap()
+                .round()
+        );
     }
 
     #[test]
@@ -129,8 +158,12 @@ mod tests {
 
     #[test]
     fn can_compute_sub() {
-        assert_eq!(1.0, compute_expression("3 - 2").unwrap().round());
-        assert_eq!(-80.0, compute_expression("20 - 100").unwrap().round());
+        let mut vm = VM::new();
+        assert_eq!(1.0, compute_expression(&mut vm, "3 - 2").unwrap().round());
+        assert_eq!(
+            -80.0,
+            compute_expression(&mut vm, "20 - 100").unwrap().round()
+        );
     }
 
     #[test]
@@ -146,7 +179,11 @@ mod tests {
 
     #[test]
     fn can_compute_multiple() {
-        assert_eq!(2.0, compute_expression("3 - sin(90)").unwrap().round());
+        let mut vm = VM::new();
+        assert_eq!(
+            2.0,
+            compute_expression(&mut vm, "3 - sin(90)").unwrap().round()
+        );
     }
 
     #[test]
@@ -163,17 +200,19 @@ mod tests {
 
     #[test]
     fn can_compute_with_basic_parens() {
-        assert_eq!(20.0, compute_expression("2 * (20 - 10)").unwrap().round());
-        assert_eq!(30.0, compute_expression("(2 * 20) - 10").unwrap().round());
-    }
-
-    fn instr_iter(input: &str) -> Vec<Instruction> {
-        let tokens: Result<Vec<_>, _> = tokenizer::tokenize_iter(input.into()).collect();
-        let tokens = dbg!(tokens.unwrap());
-
-        let mut compiler = RecursiveCompiler::new(&tokens);
-        let instructions = compiler.compile().expect("failed compile");
-        instructions
+        let mut vm = VM::new();
+        assert_eq!(
+            20.0,
+            compute_expression(&mut vm, "2 * (20 - 10)")
+                .unwrap()
+                .round()
+        );
+        assert_eq!(
+            30.0,
+            compute_expression(&mut vm, "(2 * 20) - 10")
+                .unwrap()
+                .round()
+        );
     }
 
     #[test]
@@ -199,5 +238,14 @@ mod tests {
         let result = bite.nibble(parser::Chomp::alphanumeric()).unwrap();
 
         assert_eq!(&[lhs, op, rhs, eq, result], &["x", "+", "y", "=", "z"]);
+    }
+
+    fn instr_iter(input: &str) -> Vec<Instruction> {
+        let tokens: Result<Vec<_>, _> = tokenizer::tokenize_iter(input.into()).collect();
+        let tokens = dbg!(tokens.unwrap());
+
+        let mut compiler = RecursiveCompiler::new(&tokens);
+        let instructions = compiler.compile().expect("failed compile");
+        instructions
     }
 }

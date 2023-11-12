@@ -77,7 +77,7 @@ impl<'a> Chomp<()> {
         let mut seen_dp = false;
         Chomp {
             matcher: move |x: &str| {
-                if x.split_once(|x: char| !x.is_ascii_digit() && !['.', '+', '-'].contains(&x))
+                if x.split_once(|x: char| !x.is_ascii_digit() && !['.', '-'].contains(&x))
                     .map_or(false, |(x, _)| {
                         x.len() <= 2 && !x.starts_with(|c| char::is_ascii_digit(&c))
                     })
@@ -86,7 +86,7 @@ impl<'a> Chomp<()> {
                 }
                 matchers::matches(
                     |z| match z {
-                        (0, '+' | '-') => true,
+                        (0, '-') => true,
                         (_, '.') if !seen_dp => {
                             seen_dp = true;
                             true

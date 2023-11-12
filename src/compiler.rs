@@ -1,6 +1,5 @@
 use crate::{tokenizer::Token, vm::Instruction};
 
-
 #[derive(Default)]
 pub struct RecursiveCompiler<'a> {
     position: usize,
@@ -11,7 +10,8 @@ pub struct RecursiveCompiler<'a> {
 enum RecursiveExpression {
     Literal(f64),
     BinaryOp(Box<RecursiveExpression>, BinaryOp, Box<RecursiveExpression>),
-    Func(FuncOp, Box<RecursiveExpression>),
+    Func0(Func0Op),
+    Func1(Func1Op, Box<RecursiveExpression>),
 }
 #[derive(Debug)]
 enum BinaryOp {
@@ -22,7 +22,11 @@ enum BinaryOp {
     Mod,
 }
 #[derive(Debug)]
-enum FuncOp {
+enum Func0Op {
+    Rand,
+}
+#[derive(Debug)]
+enum Func1Op {
     Sin,
     Cos,
 }
@@ -54,11 +58,14 @@ impl<'a> RecursiveCompiler<'a> {
                         BinaryOp::Mod => stream.push(Instruction::Mod),
                     }
                 }
-                RecursiveExpression::Func(op, value) => {
+                RecursiveExpression::Func0(op) => match op {
+                    Func0Op::Rand => stream.push(Instruction::PushRandom),
+                },
+                RecursiveExpression::Func1(op, value) => {
                     delve(value, stream);
                     match op {
-                        FuncOp::Sin => stream.push(Instruction::Sine),
-                        FuncOp::Cos => stream.push(Instruction::Cosine),
+                        Func1Op::Sin => stream.push(Instruction::Sine),
+                        Func1Op::Cos => stream.push(Instruction::Cosine),
                     }
                 }
             }
@@ -73,7 +80,7 @@ impl<'a> RecursiveCompiler<'a> {
 
     fn compile_expression(&mut self) -> Option<RecursiveExpression> {
         let expression = match self.peek() {
-            Some(Token::Sine | Token::Cosine) => self.compile_func_like(),
+            Some(Token::Sine | Token::Cosine | Token::Rand) => self.compile_func_like(),
             Some(Token::OpenParen) => self.compile_parens_expression(),
             Some(Token::LiteralNum(_)) => self.compile_literal_expression(),
             _ => None,
@@ -105,16 +112,36 @@ impl<'a> RecursiveCompiler<'a> {
     }
 
     fn compile_func_like(&mut self) -> Option<RecursiveExpression> {
+        if let Some(expression) = self.compile_func_0() {
+            Some(expression)
+        } else if let Some(expression) = self.compile_func_1() {
+            Some(expression)
+        } else {
+            None
+        }
+    }
+
+    fn compile_func_0(&mut self) -> Option<RecursiveExpression> {
         let func_op = match self.peek()? {
-            Token::Sine => Some(FuncOp::Sin),
-            Token::Cosine => Some(FuncOp::Cos),
+            Token::Rand => Some(Func0Op::Rand),
+            _ => None,
+        }?;
+        self.consume()?;
+        self.try_consume(&Token::OpenParen)?;
+        self.try_consume(&Token::CloseParen)?;
+        Some(RecursiveExpression::Func0(func_op))
+    }
+    fn compile_func_1(&mut self) -> Option<RecursiveExpression> {
+        let func_op = match self.peek()? {
+            Token::Sine => Some(Func1Op::Sin),
+            Token::Cosine => Some(Func1Op::Cos),
             _ => None,
         }?;
         self.consume()?;
         self.try_consume(&Token::OpenParen)?;
         let expression = self.compile_expression()?;
         self.try_consume(&Token::CloseParen)?;
-        Some(RecursiveExpression::Func(func_op, Box::new(expression)))
+        Some(RecursiveExpression::Func1(func_op, Box::new(expression)))
     }
 
     fn compile_binary_op(&mut self, lhs: RecursiveExpression) -> Option<RecursiveExpression> {
