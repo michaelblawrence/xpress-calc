@@ -9,6 +9,8 @@ pub struct RecursiveCompiler<'a> {
 #[derive(Debug)]
 enum RecursiveExpression {
     Literal(f64),
+    Local(String),
+    AssignOp(String, Box<RecursiveExpression>),
     BinaryOp(Box<RecursiveExpression>, BinaryOp, Box<RecursiveExpression>),
     Func0(Func0Op),
     Func1(Func1Op, Box<RecursiveExpression>),
@@ -47,6 +49,13 @@ impl<'a> RecursiveCompiler<'a> {
         fn delve(node: &RecursiveExpression, stream: &mut Vec<Instruction>) {
             match node {
                 RecursiveExpression::Literal(x) => stream.push(Instruction::Push(*x)),
+                RecursiveExpression::Local(ident) => {
+                    stream.push(Instruction::LoadLocal(ident.clone()))
+                }
+                RecursiveExpression::AssignOp(ident, value) => {
+                    delve(value, stream);
+                    stream.push(Instruction::Assign(ident.clone()));
+                }
                 RecursiveExpression::BinaryOp(lhs, op, rhs) => {
                     delve(lhs, stream);
                     delve(rhs, stream);
@@ -82,7 +91,9 @@ impl<'a> RecursiveCompiler<'a> {
         let expression = match self.peek() {
             Some(Token::Sine | Token::Cosine | Token::Rand) => self.compile_func_like(),
             Some(Token::OpenParen) => self.compile_parens_expression(),
+            Some(Token::Let) => self.compile_assignment_expression(),
             Some(Token::LiteralNum(_)) => self.compile_literal_expression(),
+            Some(Token::Identifier(_)) => self.compile_var_expression(),
             _ => None,
         };
 
@@ -104,11 +115,37 @@ impl<'a> RecursiveCompiler<'a> {
         }
     }
 
+    fn compile_var_expression(&mut self) -> Option<RecursiveExpression> {
+        match self.peek()? {
+            Token::Identifier(ident) => {
+                let ident = ident.clone();
+                self.consume();
+                Some(RecursiveExpression::Local(ident))
+            }
+            _ => None,
+        }
+    }
+
     fn compile_parens_expression(&mut self) -> Option<RecursiveExpression> {
         self.try_consume(&Token::OpenParen)?;
         let expression = self.compile_expression()?;
         self.try_consume(&Token::CloseParen)?;
         Some(expression)
+    }
+
+    fn compile_assignment_expression(&mut self) -> Option<RecursiveExpression> {
+        self.try_consume(&Token::Let)?;
+        let identifier = match self.peek()? {
+            Token::Identifier(ident) => Some(ident.clone()),
+            _ => None,
+        }?;
+        self.consume()?;
+        self.try_consume(&Token::Equals)?;
+        let expression = self.compile_expression()?;
+        Some(RecursiveExpression::AssignOp(
+            identifier,
+            Box::new(expression),
+        ))
     }
 
     fn compile_func_like(&mut self) -> Option<RecursiveExpression> {

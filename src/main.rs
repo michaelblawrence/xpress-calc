@@ -216,6 +216,13 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_variables() {
+        let mut vm = VM::new();
+        compute_expression(&mut vm, "let x = 1 + 2");
+        assert_eq!(5.0, compute_expression(&mut vm, "x + 2").unwrap().round());
+    }
+
+    #[test]
     fn can_parse() {
         let source = parser::Bite::new("x + y = z");
         let bite = source;

@@ -2,7 +2,7 @@ use std::{fmt::Display, str::FromStr};
 
 use crate::parser;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     LiteralNum(f64),
     Plus,
@@ -16,6 +16,9 @@ pub enum Token {
     Pow,
     Mod,
     Rand,
+    Identifier(String),
+    Let,
+    Equals,
 }
 
 pub fn tokenize_iter<'a>(
@@ -44,12 +47,18 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Cosine
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("rand")) {
         Token::Rand
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("let")) {
+        Token::Let
     } else if let Some(literal) = bite.nibble(parser::Chomp::any_number()) {
         Token::LiteralNum(parse(literal)?)
+    } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric()) {
+        Token::Identifier(indent.to_string())
     } else if let Some(_) = bite.nibble(parser::Chomp::char('(')) {
         Token::OpenParen
     } else if let Some(_) = bite.nibble(parser::Chomp::char(')')) {
         Token::CloseParen
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('=')) {
+        Token::Equals
     } else if let Some(_) = bite.nibble(parser::Chomp::char('+')) {
         Token::Plus
     } else if let Some(_) = bite.nibble(parser::Chomp::char('-')) {

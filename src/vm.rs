@@ -7,6 +7,8 @@ pub enum Instruction {
     Sine,
     Cosine,
     Push(f64),
+    Assign(String),
+    LoadLocal(String),
     PushRandom,
     Mul,
     Mod,
@@ -16,6 +18,7 @@ pub enum Instruction {
 #[derive(Debug, Default)]
 pub struct VM {
     stack: Vec<f64>,
+    locals: Vec<(String, f64)>,
     rng: Rand,
 }
 
@@ -31,6 +34,8 @@ impl VM {
                 Instruction::Sine => self.uanry_op(|x| x.to_radians().sin()),
                 Instruction::Cosine => self.uanry_op(|x| x.to_radians().cos()),
                 Instruction::Push(x) => self.push(*x),
+                Instruction::LoadLocal(ident) => self.load_local(&ident),
+                Instruction::Assign(ident) => self.assign(ident),
                 Instruction::PushRandom => self.push(self.rng.rand()),
                 Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs),
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs),
@@ -64,6 +69,31 @@ impl VM {
 
     fn push(&mut self, x: f64) {
         self.stack.push(x);
+    }
+
+    fn load_local(&mut self, identifier: &str) {
+        let (_, x) = self
+            .locals
+            .iter()
+            .find(|(ident, _)| ident == identifier)
+            .ok_or_else(|| format!("missing variable '{identifier}'"))
+            .unwrap();
+
+        self.stack.push(*x);
+    }
+
+    fn assign(&mut self, identifier: &str) {
+        let value = self.stack.pop().expect("missing assignment value");
+        if let Some((_, x)) = self
+            .locals
+            .iter_mut()
+            .find(|(ident, _)| ident == identifier)
+        {
+            *x = value;
+            return;
+        }
+
+        self.locals.push((identifier.to_string(), value));
     }
 }
 
