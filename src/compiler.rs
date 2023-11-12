@@ -1,4 +1,4 @@
-use crate::{tokenizer::Token, vm::Instruction};
+use crate::{lexer::Token, vm::Instruction};
 
 #[derive(Default)]
 pub struct Compiler<'a> {

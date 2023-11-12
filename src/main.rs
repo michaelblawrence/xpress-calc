@@ -3,7 +3,7 @@ use vm::VM;
 
 mod compiler;
 mod parser;
-mod tokenizer;
+mod lexer;
 mod vm;
 
 fn main() {
@@ -20,7 +20,7 @@ fn main() {
 
 fn compute_expression(vm: &mut VM, input: &str) -> Option<f64> {
     let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
-    let token_iter = tokenizer::tokenize_iter(source);
+    let token_iter = lexer::tokenize(source);
 
     let tokens: Vec<_> = match token_iter.collect() {
         Ok(x) => x,
@@ -58,13 +58,13 @@ fn read_line() -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::{tokenizer::Token, vm::Instruction};
+    use crate::{lexer::Token, vm::Instruction};
 
     use super::*;
 
     #[test]
     fn can_parse_sin() {
-        let mut tokens = tokenizer::tokenize_iter("sin(90)".into());
+        let mut tokens = lexer::tokenize("sin(90)".into());
 
         assert_eq!(Some(Ok(Token::Sine)), tokens.next());
         assert_eq!(Some(Ok(Token::OpenParen)), tokens.next());
@@ -267,7 +267,7 @@ mod tests {
     }
 
     fn instr_iter(input: &str) -> Vec<Instruction> {
-        let tokens: Result<Vec<_>, _> = tokenizer::tokenize_iter(input.into()).collect();
+        let tokens: Result<Vec<_>, _> = lexer::tokenize(input.into()).collect();
         let tokens = dbg!(tokens.unwrap());
 
         let mut compiler = Compiler::new(&tokens);

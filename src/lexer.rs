@@ -25,7 +25,7 @@ pub enum Token {
     Sqrt,
 }
 
-pub fn tokenize_iter<'a>(
+pub fn tokenize<'a>(
     source: parser::Bite<'a>,
 ) -> impl Iterator<Item = Result<Token, String>> + 'a {
     let mut bite = source;
