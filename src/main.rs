@@ -20,21 +20,21 @@ fn main() {
 
 fn compute_expression(vm: &mut VM, input: &str) -> Option<f64> {
     let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
-    let token_iter = tokenizer::tokenize_iter(source).map(|x| match x {
+    let token_iter = tokenizer::tokenize_iter(source);
+
+    let tokens: Vec<_> = match token_iter.collect() {
         Ok(x) => x,
         Err(err) => {
             eprintln!("ERROR: could not interpret input tokens: {err}");
-            std::process::exit(1);
+            return None;
         }
-    });
-
-    let tokens = token_iter.collect::<Vec<_>>();
+    };
     let mut compiler = RecursiveCompiler::new(&tokens);
     let program = match compiler.compile() {
         Ok(x) => x,
         Err(err) => {
             eprintln!("ERROR: could not compile program: {err}");
-            std::process::exit(1);
+            return None;
         }
     };
 
@@ -42,7 +42,7 @@ fn compute_expression(vm: &mut VM, input: &str) -> Option<f64> {
         Ok(_) => {}
         Err(err) => {
             eprintln!("ERROR: could not compute expression: {err}");
-            std::process::exit(1);
+            return None;
         }
     }
 
