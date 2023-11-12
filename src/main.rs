@@ -46,7 +46,7 @@ fn compute_expression(vm: &mut VM, input: &str) -> Option<f64> {
         }
     }
 
-    vm.result()
+    vm.pop_result()
 }
 
 fn read_line() -> String {

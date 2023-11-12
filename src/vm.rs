@@ -49,7 +49,7 @@ impl VM {
 
         Ok(())
     }
-    pub fn result(&mut self) -> Option<f64> {
+    pub fn pop_result(&mut self) -> Option<f64> {
         match self.stack.pop() {
             Some(result) => Some(result),
             _ => {
