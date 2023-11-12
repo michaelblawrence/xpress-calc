@@ -76,14 +76,18 @@ impl VM {
     }
 
     fn load_local(&mut self, identifier: &str) {
-        let (_, x) = self
+        let x = self
             .locals
             .iter()
             .find(|(ident, _)| ident == identifier)
-            .ok_or_else(|| format!("missing variable '{identifier}'"))
-            .unwrap();
+            .map(|(_, x)| *x);
 
-        self.stack.push(*x);
+        let x = x.unwrap_or_else(|| {
+            eprintln!("WARN: missing variable '{identifier}'");
+            0.0
+        });
+
+        self.stack.push(x);
     }
 
     fn assign(&mut self, identifier: &str) {

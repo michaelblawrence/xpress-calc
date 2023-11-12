@@ -100,11 +100,8 @@ impl<'a> Chomp<()> {
         }
     }
     pub fn literal(pattern: &'a str) -> Chomp<impl FnMut(&'a str) -> Option<usize>> {
-        let mut char_indices = pattern.char_indices();
         Chomp {
-            matcher: move |x: &str| {
-                matchers::matches(|x| char_indices.next().map_or(false, |c| x == &c), x)
-            },
+            matcher: move |x: &str| x.starts_with(pattern).then(|| pattern.len()),
         }
     }
     pub fn char(c: char) -> Chomp<impl Fn(&'a str) -> Option<usize>> {
