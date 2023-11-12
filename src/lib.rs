@@ -20,9 +20,9 @@ fn main() {
 
 fn compute_expression(vm: &mut VM, input: &str) -> Option<f64> {
     let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
-    let token_iter = lexer::tokenize(source);
+    let tokens = lexer::tokenize(source).collect();
 
-    let tokens: Vec<_> = match token_iter.collect() {
+    let tokens: Vec<_> = match tokens {
         Ok(x) => x,
         Err(err) => {
             eprintln!("ERROR: could not interpret input tokens: {err}");
