@@ -3,8 +3,8 @@ use crate::{tokenizer::Token, vm::Instruction};
 #[derive(Debug)]
 pub enum InstructionStreamItem {
     Single(Instruction),
+    Double(Instruction, Instruction),
     Many(Vec<Instruction>),
-    // Done(Instruction),
     Skip,
     Err(String),
 }
@@ -19,7 +19,7 @@ enum State {
 
 #[derive(Default)]
 pub struct Compiler {
-    stack: Vec<Instruction>,
+    stack: Stack,
     state: State,
 }
 
@@ -28,19 +28,33 @@ impl Compiler {
         &'a mut self,
         tokens: impl Iterator<Item = Token> + 'a,
     ) -> impl Iterator<Item = Instruction> + 'a {
+        enum IterState {
+            Empty,
+            Single(Instruction),
+            Multi(Vec<Instruction>, usize),
+        }
+
         let mut tokens = tokens.into_iter().chain(std::iter::once(Token::EOF));
-        let mut current: Option<(Vec<Instruction>, usize)> = None;
+        let mut current = IterState::Empty;
         let mut done = false;
 
         std::iter::from_fn(move || {
-            if let Some((many, idx)) = &mut current {
-                if *idx >= many.len() {
-                    current = None;
-                } else {
-                    let next = many.get(*idx).cloned();
-                    *idx += 1;
-                    return next;
+            match &mut current {
+                IterState::Multi(many, idx) => {
+                    if *idx >= many.len() {
+                        current = IterState::Empty;
+                    } else {
+                        let next = many.get(*idx).cloned();
+                        *idx += 1;
+                        return next;
+                    }
                 }
+                IterState::Single(next) => {
+                    let next = next.clone();
+                    current = IterState::Empty;
+                    return Some(next);
+                }
+                IterState::Empty => (),
             }
 
             if done {
@@ -53,9 +67,13 @@ impl Compiler {
                 }
                 match self.next_impl(token) {
                     InstructionStreamItem::Single(single) => return Some(single),
+                    InstructionStreamItem::Double(first, second) => {
+                        current = IterState::Single(second);
+                        return Some(first);
+                    }
                     InstructionStreamItem::Many(many) => {
                         let first = many.first().cloned();
-                        current = Some((many, 1));
+                        current = IterState::Multi(many, 1);
                         return first;
                     }
                     InstructionStreamItem::Skip => continue,
@@ -145,29 +163,28 @@ impl Compiler {
             },
         };
 
-        let routine = self
-            .stack
-            .iter_mut()
-            .rfind(|x| matches!(x, Instruction::Routine(_, _)));
-
-        match (routine, next) {
-            (Some(Instruction::Routine(_, many)), InstructionStreamItem::Single(next)) => {
-                many.push(next);
-                InstructionStreamItem::Skip
-            }
-            (Some(Instruction::Routine(_, many)), InstructionStreamItem::Many(next)) => {
-                for item in next {
-                    many.push(item);
+        match next {
+            InstructionStreamItem::Single(next) => match self.stack.try_add(next) {
+                Ok(()) => InstructionStreamItem::Skip,
+                Err(next) => InstructionStreamItem::Single(next),
+            },
+            InstructionStreamItem::Double(first, second) => {
+                match self.stack.try_add_many([first, second].into_iter()) {
+                    Ok(()) => InstructionStreamItem::Skip,
+                    Err(next) => InstructionStreamItem::Many(next),
                 }
-                InstructionStreamItem::Skip
             }
-            (_, next) => next,
+            InstructionStreamItem::Many(next) => match self.stack.try_add_many(next.into_iter()) {
+                Ok(()) => InstructionStreamItem::Skip,
+                Err(next) => InstructionStreamItem::Many(next),
+            },
+            next => next,
         }
     }
 
     fn pop_stack(
         instr: Instruction,
-        stack: &mut Vec<Instruction>,
+        stack: &mut Stack,
         state: &mut State,
     ) -> InstructionStreamItem {
         if let Some(Instruction::Routine(_, many)) = stack.last_mut() {
@@ -177,29 +194,84 @@ impl Compiler {
         match stack.pop() {
             Some(Instruction::Sine) => {
                 *state =
-                    State::ExpectClose(InstructionStreamItem::Many(vec![instr, Instruction::Sine]));
+                    State::ExpectClose(InstructionStreamItem::Double(instr, Instruction::Sine));
                 InstructionStreamItem::Skip
             }
             Some(Instruction::Cosine) => {
-                *state = State::ExpectClose(InstructionStreamItem::Many(vec![
-                    instr,
-                    Instruction::Cosine,
-                ]));
+                *state =
+                    State::ExpectClose(InstructionStreamItem::Double(instr, Instruction::Cosine));
                 InstructionStreamItem::Skip
             }
-            Some(Instruction::Add) => InstructionStreamItem::Many(vec![instr, Instruction::Add]),
-            Some(Instruction::Sub) => InstructionStreamItem::Many(vec![instr, Instruction::Sub]),
-            Some(Instruction::Mul) => InstructionStreamItem::Many(vec![instr, Instruction::Mul]),
-            Some(Instruction::Div) => InstructionStreamItem::Many(vec![instr, Instruction::Div]),
-            // Some(Instruction::Routine(mut many)) => {
-            //     many.push(instr);
-            //     InstructionStreamItem::Many(many)
-            // }
+            Some(Instruction::Add) => InstructionStreamItem::Double(instr, Instruction::Add),
+            Some(Instruction::Sub) => InstructionStreamItem::Double(instr, Instruction::Sub),
+            Some(Instruction::Mul) => InstructionStreamItem::Double(instr, Instruction::Mul),
+            Some(Instruction::Div) => InstructionStreamItem::Double(instr, Instruction::Div),
             None => InstructionStreamItem::Single(instr),
 
             Some(Instruction::Routine(_, _)) => unreachable!(),
             Some(Instruction::Noop) => unreachable!(),
             Some(Instruction::Push(_)) => unreachable!(),
         }
+    }
+}
+
+#[derive(Default)]
+struct Stack(Vec<Instruction>);
+
+impl Stack {
+    pub fn push(&mut self, value: Instruction) {
+        self.0.push(value)
+    }
+
+    pub fn pop(&mut self) -> Option<Instruction> {
+        self.0.pop()
+    }
+
+    pub fn last(&self) -> Option<&Instruction> {
+        self.0.last()
+    }
+
+    pub fn last_mut(&mut self) -> Option<&mut Instruction> {
+        self.0.last_mut()
+    }
+
+    pub fn try_add(&mut self, value: Instruction) -> Result<(), Instruction> {
+        self.try_add_many(std::iter::once(value))
+            .map_err(|x| x.into_iter().next().unwrap())
+    }
+
+    pub fn try_add_many(
+        &mut self,
+        value: impl Iterator<Item = Instruction>,
+    ) -> Result<(), Vec<Instruction>> {
+        fn inner_impl(
+            inner: &mut Vec<Instruction>,
+            value: impl Iterator<Item = Instruction>,
+            level: usize,
+        ) -> Result<(), Vec<Instruction>> {
+            let routine = inner
+                .iter_mut()
+                .rfind(|x| matches!(x, Instruction::Routine(_, _)));
+
+            match (level, routine) {
+                (0, Some(Instruction::Routine(_, many))) => {
+                    for item in value {
+                        many.push(item);
+                    }
+                    Ok(())
+                }
+                (level, Some(Instruction::Routine(_, many))) => inner_impl(many, value, level + 1),
+                (level, _) if level > 0 => {
+                    for item in value {
+                        inner.push(item);
+                    }
+                    Ok(())
+                }
+                _ => Err(value.collect()),
+            }
+        }
+
+        let inner = &mut self.0;
+        inner_impl(inner, value, 0)
     }
 }
