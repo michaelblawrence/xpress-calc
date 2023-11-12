@@ -20,6 +20,8 @@ pub enum Token {
     Identifier(String),
     Let,
     Equals,
+    Pi,
+    E,
     Sqrt,
 }
 
@@ -53,6 +55,10 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Rand
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("let")) {
         Token::Let
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("pi")) {
+        Token::Pi
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("E")) {
+        Token::E
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("sqrt")) {
         Token::Sqrt
     } else if let Some(literal) = bite.nibble(parser::Chomp::any_number()) {

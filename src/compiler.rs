@@ -103,6 +103,7 @@ impl<'a> RecursiveCompiler<'a> {
             }
             Some(Token::OpenParen) => self.compile_parens_expression(),
             Some(Token::Let) => self.compile_assignment_expression(),
+            Some(Token::Pi | Token::E) => self.compile_const_expression(),
             Some(Token::LiteralNum(_)) => self.compile_literal_expression(),
             Some(Token::Identifier(_)) => self.compile_var_expression(),
             _ => None,
@@ -114,6 +115,20 @@ impl<'a> RecursiveCompiler<'a> {
                 Some(Token::Plus | Token::Sub | Token::Mul | Token::Div | Token::Mod | Token::Pow),
             ) => self.compile_binary_op(lhs),
             (expression, _) => expression,
+        }
+    }
+
+    fn compile_const_expression(&mut self) -> Option<RecursiveExpression> {
+        match *self.peek()? {
+            Token::Pi => {
+                self.consume();
+                Some(RecursiveExpression::Literal(std::f64::consts::PI))
+            }
+            Token::E => {
+                self.consume();
+                Some(RecursiveExpression::Literal(std::f64::consts::E))
+            }
+            _ => None,
         }
     }
 
