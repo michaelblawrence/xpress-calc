@@ -20,6 +20,7 @@ pub enum Token {
     Identifier(String),
     Let,
     Equals,
+    Sqrt,
 }
 
 pub fn tokenize_iter<'a>(
@@ -52,6 +53,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Rand
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("let")) {
         Token::Let
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("sqrt")) {
+        Token::Sqrt
     } else if let Some(literal) = bite.nibble(parser::Chomp::any_number()) {
         Token::LiteralNum(parse(literal)?)
     } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric()) {

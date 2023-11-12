@@ -32,6 +32,7 @@ enum Func0Op {
 enum Func1Op {
     Sin,
     Cos,
+    Sqrt,
     Log,
 }
 
@@ -78,6 +79,10 @@ impl<'a> RecursiveCompiler<'a> {
                     match op {
                         Func1Op::Sin => stream.push(Instruction::Sine),
                         Func1Op::Cos => stream.push(Instruction::Cosine),
+                        Func1Op::Sqrt => {
+                            stream.push(Instruction::Push(0.5));
+                            stream.push(Instruction::Pow);
+                        }
                         Func1Op::Log => stream.push(Instruction::Log),
                     }
                 }
@@ -93,7 +98,9 @@ impl<'a> RecursiveCompiler<'a> {
 
     fn compile_expression(&mut self) -> Option<RecursiveExpression> {
         let expression = match self.peek() {
-            Some(Token::Sine | Token::Cosine | Token::Log | Token::Rand) => self.compile_func_like(),
+            Some(Token::Sine | Token::Cosine | Token::Log | Token::Sqrt | Token::Rand) => {
+                self.compile_func_like()
+            }
             Some(Token::OpenParen) => self.compile_parens_expression(),
             Some(Token::Let) => self.compile_assignment_expression(),
             Some(Token::LiteralNum(_)) => self.compile_literal_expression(),
@@ -177,6 +184,7 @@ impl<'a> RecursiveCompiler<'a> {
         let func_op = match self.peek()? {
             Token::Sine => Some(Func1Op::Sin),
             Token::Cosine => Some(Func1Op::Cos),
+            Token::Sqrt => Some(Func1Op::Sqrt),
             Token::Log => Some(Func1Op::Log),
             _ => None,
         }?;

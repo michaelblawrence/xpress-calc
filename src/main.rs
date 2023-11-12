@@ -180,6 +180,12 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_sqrt() {
+        let mut vm = VM::new();
+        assert_eq!(10.0, compute_expression(&mut vm, "sqrt(100)").unwrap().round());
+    }
+
+    #[test]
     fn can_compile_multiple() {
         let mut instructions = instr_iter("3 - sin(90)").into_iter();
 
