@@ -1,4 +1,4 @@
-use compiler::RecursiveCompiler;
+use compiler::Compiler;
 use vm::VM;
 
 mod compiler;
@@ -29,7 +29,7 @@ fn compute_expression(vm: &mut VM, input: &str) -> Option<f64> {
             return None;
         }
     };
-    let mut compiler = RecursiveCompiler::new(&tokens);
+    let mut compiler = Compiler::new(&tokens);
     let program = match compiler.compile() {
         Ok(x) => x,
         Err(err) => {
@@ -270,7 +270,7 @@ mod tests {
         let tokens: Result<Vec<_>, _> = tokenizer::tokenize_iter(input.into()).collect();
         let tokens = dbg!(tokens.unwrap());
 
-        let mut compiler = RecursiveCompiler::new(&tokens);
+        let mut compiler = Compiler::new(&tokens);
         let instructions = compiler.compile().expect("failed compile");
         instructions
     }

@@ -1,7 +1,7 @@
 use crate::{tokenizer::Token, vm::Instruction};
 
 #[derive(Default)]
-pub struct RecursiveCompiler<'a> {
+pub struct Compiler<'a> {
     position: usize,
     program: &'a [Token],
 }
@@ -36,7 +36,7 @@ enum Func1Op {
     Log,
 }
 
-impl<'a> RecursiveCompiler<'a> {
+impl<'a> Compiler<'a> {
     pub fn new(program: &'a [Token]) -> Self {
         Self {
             position: Default::default(),
