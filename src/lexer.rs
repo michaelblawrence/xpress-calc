@@ -25,10 +25,8 @@ pub enum Token {
     Sqrt,
 }
 
-pub fn tokenize<'a>(
-    source: parser::Bite<'a>,
-) -> impl Iterator<Item = Result<Token, String>> + 'a {
-    let mut bite = source;
+pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Token, String>> + 'a {
+    let mut bite = source.chomp(parser::Chomp::whitespace());
     let mut done = false;
 
     std::iter::from_fn(move || {
@@ -37,6 +35,8 @@ pub fn tokenize<'a>(
             let token: Result<Token, String> = tokenize_impl(&mut bite);
             if token.is_err() {
                 done = true;
+            } else {
+                bite = bite.chomp(parser::Chomp::whitespace());
             }
             token
         })

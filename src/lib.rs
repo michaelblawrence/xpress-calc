@@ -109,6 +109,9 @@ mod tests {
     fn can_compute_add_brackets() {
         let mut vm = VM::new();
         assert_eq!(3.0, compute(&mut vm, "(1) + (1) + (1)").unwrap().round());
+        assert_eq!(10.0, compute(&mut vm, "( 1 ) + (2) + (3 ) + ( 4)").unwrap().round());
+        assert_eq!(16.0, compute(&mut vm, "( 8 + 8 )").unwrap().round());
+        assert_eq!(4.0, compute(&mut vm, " ( 2 + 2 ) ").unwrap().round());
     }
 
     #[test]
