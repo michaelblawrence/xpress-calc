@@ -15,7 +15,7 @@ enum RecursiveExpression {
     Func0(Func0Op),
     Func1(Func1Op, Box<RecursiveExpression>),
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum BinaryOp {
     Add,
     Sub,
@@ -24,6 +24,17 @@ enum BinaryOp {
     Mod,
     Pow,
 }
+
+impl BinaryOp {
+    fn precedence(&self) -> usize {
+        match self {
+            Self::Pow | Self::Mod => 2,
+            Self::Mul | Self::Div => 1,
+            Self::Add | Self::Sub => 0,
+        }
+    }
+}
+
 #[derive(Debug)]
 enum Func0Op {
     Rand,
@@ -90,46 +101,45 @@ impl<'a> Compiler<'a> {
         }
 
         let mut instruction_stream = vec![];
-
         delve(&program_expression, &mut instruction_stream);
 
         Ok(instruction_stream)
     }
 
     fn compile_expression(&mut self) -> Option<RecursiveExpression> {
-        let expression = match self.peek() {
-            Some(Token::Sine | Token::Cosine | Token::Log | Token::Sqrt | Token::Rand) => {
-                self.compile_func_like()
-            }
+        let expression = self.compile_primary_expression();
+
+        match (expression, self.peek_binary_op()) {
+            (Some(lhs), Some(_)) => self.compile_binary_op(lhs, 0),
+            (expression, _) => expression,
+        }
+    }
+
+    fn compile_primary_expression(&mut self) -> Option<RecursiveExpression> {
+        match self.peek() {
             Some(Token::OpenParen) => self.compile_parens_expression(),
             Some(Token::Let) => self.compile_assignment_expression(),
             Some(Token::Pi | Token::E) => self.compile_const_expression(),
             Some(Token::LiteralNum(_)) => self.compile_literal_expression(),
             Some(Token::Identifier(_)) => self.compile_var_expression(),
-            _ => None,
-        };
-
-        match (expression, self.peek()) {
-            (
-                Some(lhs),
-                Some(Token::Plus | Token::Sub | Token::Mul | Token::Div | Token::Mod | Token::Pow),
-            ) => self.compile_binary_op(lhs),
-            (expression, _) => expression,
+            _ => {
+                if let Some(_) = self.peek_func_0_op() {
+                    self.compile_func_0()
+                } else if let Some(_) = self.peek_func_1_op() {
+                    self.compile_func_1()
+                } else if let Some(_) = self.peek_const_literal() {
+                    self.compile_const_expression()
+                } else {
+                    None
+                }
+            }
         }
     }
 
     fn compile_const_expression(&mut self) -> Option<RecursiveExpression> {
-        match *self.peek()? {
-            Token::Pi => {
-                self.consume();
-                Some(RecursiveExpression::Literal(std::f64::consts::PI))
-            }
-            Token::E => {
-                self.consume();
-                Some(RecursiveExpression::Literal(std::f64::consts::E))
-            }
-            _ => None,
-        }
+        let x = self.peek_const_literal()?;
+        self.consume();
+        Some(RecursiveExpression::Literal(x))
     }
 
     fn compile_literal_expression(&mut self) -> Option<RecursiveExpression> {
@@ -175,34 +185,16 @@ impl<'a> Compiler<'a> {
         ))
     }
 
-    fn compile_func_like(&mut self) -> Option<RecursiveExpression> {
-        if let Some(expression) = self.compile_func_0() {
-            Some(expression)
-        } else if let Some(expression) = self.compile_func_1() {
-            Some(expression)
-        } else {
-            None
-        }
-    }
-
     fn compile_func_0(&mut self) -> Option<RecursiveExpression> {
-        let func_op = match self.peek()? {
-            Token::Rand => Some(Func0Op::Rand),
-            _ => None,
-        }?;
+        let func_op = self.peek_func_0_op()?;
         self.consume()?;
         self.try_consume(&Token::OpenParen)?;
         self.try_consume(&Token::CloseParen)?;
         Some(RecursiveExpression::Func0(func_op))
     }
+
     fn compile_func_1(&mut self) -> Option<RecursiveExpression> {
-        let func_op = match self.peek()? {
-            Token::Sine => Some(Func1Op::Sin),
-            Token::Cosine => Some(Func1Op::Cos),
-            Token::Sqrt => Some(Func1Op::Sqrt),
-            Token::Log => Some(Func1Op::Log),
-            _ => None,
-        }?;
+        let func_op = self.peek_func_1_op()?;
         self.consume()?;
         self.try_consume(&Token::OpenParen)?;
         let expression = self.compile_expression()?;
@@ -210,8 +202,37 @@ impl<'a> Compiler<'a> {
         Some(RecursiveExpression::Func1(func_op, Box::new(expression)))
     }
 
-    fn compile_binary_op(&mut self, lhs: RecursiveExpression) -> Option<RecursiveExpression> {
-        let binary_op = match self.peek()? {
+    fn compile_binary_op(
+        &mut self,
+        mut lhs: RecursiveExpression,
+        min_precedence: usize,
+    ) -> Option<RecursiveExpression> {
+        while let Some(op) = self
+            .peek_binary_op()
+            .filter(|op| op.precedence() >= min_precedence)
+        {
+            self.consume()?;
+            let mut rhs = self.compile_primary_expression()?;
+
+            while let Some(_) = self
+                .peek_binary_op()
+                .filter(|next_op| next_op.precedence() > op.precedence())
+            {
+                rhs = self.compile_binary_op(rhs, op.precedence() + 1)?;
+            }
+
+            lhs = RecursiveExpression::BinaryOp(Box::new(lhs), op, Box::new(rhs))
+        }
+
+        Some(lhs)
+    }
+
+    fn peek(&self) -> Option<&Token> {
+        self.program.get(self.position)
+    }
+
+    fn peek_binary_op(&mut self) -> Option<BinaryOp> {
+        match self.peek()? {
             Token::Plus => Some(BinaryOp::Add),
             Token::Sub => Some(BinaryOp::Sub),
             Token::Mul => Some(BinaryOp::Mul),
@@ -219,18 +240,32 @@ impl<'a> Compiler<'a> {
             Token::Mod => Some(BinaryOp::Mod),
             Token::Pow => Some(BinaryOp::Pow),
             _ => None,
-        }?;
-        self.consume()?;
-        let rhs = self.compile_expression()?;
-        Some(RecursiveExpression::BinaryOp(
-            Box::new(lhs),
-            binary_op,
-            Box::new(rhs),
-        ))
+        }
     }
 
-    fn peek(&self) -> Option<&Token> {
-        self.program.get(self.position)
+    fn peek_func_0_op(&mut self) -> Option<Func0Op> {
+        match self.peek()? {
+            Token::Rand => Some(Func0Op::Rand),
+            _ => None,
+        }
+    }
+
+    fn peek_func_1_op(&mut self) -> Option<Func1Op> {
+        match self.peek()? {
+            Token::Sine => Some(Func1Op::Sin),
+            Token::Cosine => Some(Func1Op::Cos),
+            Token::Sqrt => Some(Func1Op::Sqrt),
+            Token::Log => Some(Func1Op::Log),
+            _ => None,
+        }
+    }
+
+    fn peek_const_literal(&mut self) -> Option<f64> {
+        match self.peek()? {
+            Token::Pi => Some(std::f64::consts::PI),
+            Token::E => Some(std::f64::consts::E),
+            _ => None,
+        }
     }
 
     fn consume(&mut self) -> Option<&Token> {

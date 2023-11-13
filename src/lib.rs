@@ -178,6 +178,13 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_with_precedence() {
+        let mut vm = VM::new();
+        assert_eq!(11.0, compute(&mut vm, "2 * 3 + 5").unwrap().round());
+        assert_eq!(17.0, compute(&mut vm, "2 + 3 * 5").unwrap().round());
+    }
+
+    #[test]
     fn can_compute_variables() {
         let mut vm = VM::new();
         compute(&mut vm, "let x = 1 + 2");
