@@ -7,3 +7,8 @@ edition = "2021"
 
 [dependencies]
 tiny-rng = "0.2.0"
+
+[workspace]
+members = [
+    "web",
+]
