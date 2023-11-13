@@ -75,9 +75,9 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Plus
     } else if let Some(_) = bite.nibble(parser::Chomp::char('-')) {
         Token::Sub
-    } else if let Some(_) = bite.nibble(parser::Chomp::char('*')) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('*').or(parser::Chomp::char('×'))) {
         Token::Mul
-    } else if let Some(_) = bite.nibble(parser::Chomp::char('/')) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('/').or(parser::Chomp::char('÷'))) {
         Token::Div
     } else if let Some(_) = bite.nibble(parser::Chomp::char('^')) {
         Token::Pow
