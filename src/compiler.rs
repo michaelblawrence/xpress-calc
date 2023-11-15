@@ -10,10 +10,12 @@ pub struct Compiler<'a> {
 enum RecursiveExpression {
     Literal(f64),
     Local(String),
+    FuncDeclaration(Vec<String>, Box<RecursiveExpression>),
     AssignOp(String, Box<RecursiveExpression>),
     BinaryOp(Box<RecursiveExpression>, BinaryOp, Box<RecursiveExpression>),
     Func0(Func0Op),
     Func1(Func1Op, Box<RecursiveExpression>),
+    FuncLocal(String, Vec<RecursiveExpression>),
 }
 #[derive(Debug, Clone, Copy)]
 enum BinaryOp {
@@ -66,6 +68,24 @@ impl<'a> Compiler<'a> {
                 RecursiveExpression::Local(ident) => {
                     stream.push(Instruction::LoadLocal(ident.clone()))
                 }
+                RecursiveExpression::FuncDeclaration(params, body) => {
+                    let mut routine = vec![];
+                    delve(body, &mut routine);
+                    let routine = params
+                        .iter()
+                        .map(|ident| Instruction::Assign(format!("_{ident}")))
+                        .chain(routine.into_iter().map(|instr| match instr {
+                            Instruction::LoadLocal(ident) if params.contains(&ident) => {
+                                Instruction::LoadLocal(format!("_{ident}"))
+                            }
+                            Instruction::Assign(ident) if params.contains(&ident) => {
+                                Instruction::Assign(format!("_{ident}"))
+                            }
+                            instr => instr,
+                        }))
+                        .collect();
+                    stream.push(Instruction::PushRoutine(routine))
+                }
                 RecursiveExpression::AssignOp(ident, value) => {
                     delve(value, stream);
                     stream.push(Instruction::Assign(ident.clone()));
@@ -96,6 +116,11 @@ impl<'a> Compiler<'a> {
                         }
                         Func1Op::Log => stream.push(Instruction::Log),
                     }
+                }
+                RecursiveExpression::FuncLocal(ident, args) => {
+                    args.iter().rev().for_each(|node| delve(node, stream));
+                    stream.push(Instruction::LoadLocal(ident.clone()));
+                    stream.push(Instruction::CallRoutine);
                 }
             }
         }
@@ -156,18 +181,42 @@ impl<'a> Compiler<'a> {
         match self.peek()? {
             Token::Identifier(ident) => {
                 let ident = ident.clone();
-                self.consume();
-                Some(RecursiveExpression::Local(ident))
+                self.consume()?;
+                match self.peek() {
+                    Some(Token::OpenParen) => {
+                        self.consume()?;
+                        let args = self.parse_func_argument_list()?;
+                        self.try_consume(&Token::CloseParen)?;
+                        Some(RecursiveExpression::FuncLocal(ident, args))
+                    }
+                    _ => Some(RecursiveExpression::Local(ident)),
+                }
             }
             _ => None,
         }
     }
 
     fn compile_parens_expression(&mut self) -> Option<RecursiveExpression> {
+        if let Some(fn_expression) = self.try_or_revert(Self::compile_func_expression) {
+            return Some(fn_expression);
+        }
+
         self.try_consume(&Token::OpenParen)?;
         let expression = self.compile_expression()?;
         self.try_consume(&Token::CloseParen)?;
         Some(expression)
+    }
+
+    fn compile_func_expression(&mut self) -> Option<RecursiveExpression> {
+        self.try_consume(&Token::OpenParen)?;
+        let parameters = self.parse_func_params()?;
+        self.try_consume(&Token::CloseParen)?;
+        self.try_consume(&Token::LeftArrow)?;
+        let body = self.compile_expression()?;
+        Some(RecursiveExpression::FuncDeclaration(
+            parameters,
+            Box::new(body),
+        ))
     }
 
     fn compile_assignment_expression(&mut self) -> Option<RecursiveExpression> {
@@ -227,6 +276,29 @@ impl<'a> Compiler<'a> {
         Some(lhs)
     }
 
+    fn parse_func_params(&mut self) -> Option<Vec<String>> {
+        let mut idents = vec![];
+        while let Some(Token::Identifier(ident)) = self.peek() {
+            idents.push(ident.clone());
+            self.consume()?;
+            if let None = self.try_consume(&Token::Comma) {
+                break;
+            }
+        }
+        Some(idents)
+    }
+
+    fn parse_func_argument_list(&mut self) -> Option<Vec<RecursiveExpression>> {
+        let mut idents = vec![];
+        while let Some(expression) = self.compile_expression() {
+            idents.push(expression);
+            if let None = self.try_consume(&Token::Comma) {
+                break;
+            }
+        }
+        Some(idents)
+    }
+
     fn peek(&self) -> Option<&Token> {
         self.program.get(self.position)
     }
@@ -282,5 +354,17 @@ impl<'a> Compiler<'a> {
         } else {
             None
         }
+    }
+
+    fn try_or_revert(
+        &mut self,
+        mut compile_fn: impl FnMut(&mut Self) -> Option<RecursiveExpression>,
+    ) -> Option<RecursiveExpression> {
+        let initial_position = self.position;
+        let compile_result = compile_fn(self);
+        if compile_result.is_none() {
+            self.position = initial_position;
+        }
+        compile_result
     }
 }

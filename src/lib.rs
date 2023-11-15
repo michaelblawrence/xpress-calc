@@ -39,7 +39,7 @@ pub fn compute(vm: &mut VM, input: &str) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{lexer::Token, vm::Instruction};
+    use crate::{lexer::Token, tests::helpers::ToFixedPrecision, vm::Instruction};
 
     use super::*;
 
@@ -52,6 +52,76 @@ mod tests {
         assert_eq!(Some(Ok(Token::LiteralNum(90.0))), tokens.next());
         assert_eq!(Some(Ok(Token::CloseParen)), tokens.next());
         assert_eq!(None, tokens.next());
+    }
+
+    #[test]
+    fn can_compile_define_fn() {
+        let mut instructions = instr_iter("let s = (x) => sin(x) + x").into_iter();
+
+        assert_eq!(
+            Some(Instruction::PushRoutine(vec![
+                Instruction::Assign(String::from("_x")),
+                Instruction::LoadLocal(String::from("_x")),
+                Instruction::Sine,
+                Instruction::LoadLocal(String::from("_x")),
+                Instruction::Add
+            ])),
+            instructions.next()
+        );
+        assert_eq!(
+            Some(Instruction::Assign(String::from("s"))),
+            instructions.next()
+        );
+        assert_eq!(None, instructions.next());
+    }
+
+    mod helpers {
+        pub trait ToFixedPrecision: Copy {
+            fn to_fixed(self, decimals: usize) -> Self;
+        }
+
+        impl ToFixedPrecision for f64 {
+            fn to_fixed(self, decimals: usize) -> Self {
+                let factor = 10i32.pow(decimals as u32) as f64;
+                (self * factor).round() / factor
+            }
+        }
+    }
+
+    #[test]
+    fn can_compute_define_fn() {
+        let mut vm = VM::new();
+        assert_eq!(None, compute(&mut vm, "let s = (x) => (x - 3) * (x - 2)"));
+        assert_eq!(0.0, compute(&mut vm, "s(3)").unwrap().round());
+        assert_eq!(0.0, compute(&mut vm, "s(2)").unwrap().round());
+        assert_eq!(6.0, compute(&mut vm, "s(0)").unwrap().round());
+        assert_eq!(6.0, compute(&mut vm, "s(s(3) + s(2))").unwrap().round());
+
+        assert_eq!(None, compute(&mut vm, "let s1 = (x, y) => x^2 + y^2"));
+        assert_eq!(
+            1.0,
+            compute(&mut vm, "s1(1/sqrt(2), 1/sqrt(2))")
+                .unwrap()
+                .to_fixed(2)
+        );
+        assert_eq!(
+            1.0,
+            compute(&mut vm, "s1(sin(40), cos(40))")
+                .unwrap()
+                .to_fixed(2)
+        );
+        assert_eq!(
+            1.0,
+            compute(&mut vm, "s1(sin(90), cos(90))")
+                .unwrap()
+                .to_fixed(2)
+        );
+        assert_eq!(
+            None,
+            compute(&mut vm, "let s2 = (x, y, z) => (x - y) mod z")
+        );
+        assert_eq!(1.0, compute(&mut vm, "s2(10, 1, 4)").unwrap().round());
+        assert_eq!(2.0, compute(&mut vm, "s2(20, 9, 3)").unwrap().round());
     }
 
     #[test]
@@ -109,7 +179,12 @@ mod tests {
     fn can_compute_add_brackets() {
         let mut vm = VM::new();
         assert_eq!(3.0, compute(&mut vm, "(1) + (1) + (1)").unwrap().round());
-        assert_eq!(10.0, compute(&mut vm, "( 1 ) + (2) + (3 ) + ( 4)").unwrap().round());
+        assert_eq!(
+            10.0,
+            compute(&mut vm, "( 1 ) + (2) + (3 ) + ( 4)")
+                .unwrap()
+                .round()
+        );
         assert_eq!(16.0, compute(&mut vm, "( 8 + 8 )").unwrap().round());
         assert_eq!(4.0, compute(&mut vm, " ( 2 + 2 ) ").unwrap().round());
     }
