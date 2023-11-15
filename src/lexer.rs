@@ -19,10 +19,12 @@ pub enum Token {
     Rand,
     Identifier(String),
     Let,
+    LeftArrow,
     Equals,
     Pi,
     E,
     Sqrt,
+    Comma,
 }
 
 pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Token, String>> + 'a {
@@ -63,12 +65,14 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Sqrt
     } else if let Some(literal) = bite.nibble(parser::Chomp::any_number()) {
         Token::LiteralNum(parse(literal)?)
-    } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric()) {
-        Token::Identifier(indent.to_string())
     } else if let Some(_) = bite.nibble(parser::Chomp::char('(')) {
         Token::OpenParen
     } else if let Some(_) = bite.nibble(parser::Chomp::char(')')) {
         Token::CloseParen
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("=>")) {
+        Token::LeftArrow
+    } else if let Some(_) = bite.nibble(parser::Chomp::char(',')) {
+        Token::Comma
     } else if let Some(_) = bite.nibble(parser::Chomp::char('=')) {
         Token::Equals
     } else if let Some(_) = bite.nibble(parser::Chomp::char('+')) {
@@ -81,8 +85,10 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Div
     } else if let Some(_) = bite.nibble(parser::Chomp::char('^')) {
         Token::Pow
-    } else if let Some(_) = bite.nibble(parser::Chomp::char('%')) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('%').or(parser::Chomp::literal("mod"))) {
         Token::Mod
+    } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric()) {
+        Token::Identifier(indent.to_string())
     } else {
         Err(format!("Could not parse: {}", bite.as_str()))?
     };
