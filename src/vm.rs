@@ -10,6 +10,8 @@ pub enum Instruction {
     Push(f64),
     Assign(String),
     LoadLocal(String),
+    CallRoutine,
+    PushRoutine(Vec<Instruction>),
     PushRandom,
     Mul,
     Mod,
@@ -17,10 +19,38 @@ pub enum Instruction {
     Pow,
 }
 
+#[derive(Debug, Clone)]
+enum Value {
+    Number(f64),
+    Routine(Vec<Instruction>),
+}
+
+impl Value {
+    fn as_number(&self) -> f64 {
+        match self {
+            Self::Number(v) => *v,
+            Self::Routine(routine) if !routine.is_empty() => 1.0,
+            Self::Routine(_) => 0.0,
+        }
+    }
+}
+
+impl From<Vec<Instruction>> for Value {
+    fn from(v: Vec<Instruction>) -> Self {
+        Self::Routine(v)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(v: f64) -> Self {
+        Self::Number(v)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct VM {
-    stack: Vec<f64>,
-    locals: Vec<(String, f64)>,
+    stack: Vec<Value>,
+    locals: Vec<(String, Value)>,
     rng: Rand,
 }
 
@@ -39,6 +69,8 @@ impl VM {
                 Instruction::Push(x) => self.push(*x),
                 Instruction::LoadLocal(ident) => self.load_local(&ident),
                 Instruction::Assign(ident) => self.assign(ident),
+                Instruction::CallRoutine => self.call_routine()?,
+                Instruction::PushRoutine(routine) => self.push(routine.to_vec()),
                 Instruction::PushRandom => self.push(self.rng.rand()),
                 Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs),
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs),
@@ -51,7 +83,7 @@ impl VM {
     }
     pub fn pop_result(&mut self) -> Option<f64> {
         match self.stack.pop() {
-            Some(result) => Some(result),
+            Some(result) => Some(result.as_number()),
             _ => {
                 dbg!(self);
                 None
@@ -60,19 +92,19 @@ impl VM {
     }
 
     fn uanry_op(&mut self, op: impl FnOnce(f64) -> f64) {
-        let result = op(self.stack.pop().expect("missing operand"));
-        self.stack.push(result);
+        let result = op(self.stack.pop().expect("missing operand").as_number());
+        self.stack.push(result.into());
     }
 
     fn binary_op(&mut self, op: impl FnOnce(f64, f64) -> f64) {
-        let rhs = self.stack.pop().expect("missing rhs");
-        let lhs = self.stack.pop().expect("missing lhs");
+        let rhs = self.stack.pop().expect("missing rhs").as_number();
+        let lhs = self.stack.pop().expect("missing lhs").as_number();
         let result = op(lhs, rhs);
-        self.stack.push(result);
+        self.stack.push(result.into());
     }
 
-    fn push(&mut self, x: f64) {
-        self.stack.push(x);
+    fn push(&mut self, x: impl Into<Value>) {
+        self.stack.push(x.into());
     }
 
     fn load_local(&mut self, identifier: &str) {
@@ -80,14 +112,14 @@ impl VM {
             .locals
             .iter()
             .find(|(ident, _)| ident == identifier)
-            .map(|(_, x)| *x);
+            .map(|(_, x)| x.clone());
 
         let x = x.unwrap_or_else(|| {
             eprintln!("WARN: missing variable '{identifier}'");
-            0.0
+            0.0.into()
         });
 
-        self.stack.push(x);
+        self.stack.push(x.into());
     }
 
     fn assign(&mut self, identifier: &str) {
@@ -102,6 +134,20 @@ impl VM {
         }
 
         self.locals.push((identifier.to_string(), value));
+    }
+
+    fn call_routine(&mut self) -> Result<(), String> {
+        match self.stack.pop() {
+            Some(Value::Routine(routine)) => self.run(&routine),
+            Some(x) => {
+                eprintln!("WARN: current value is not callable '{x:?}'");
+                Ok(())
+            }
+            None => {
+                eprintln!("WARN: no current value to call");
+                Ok(())
+            }
+        }
     }
 }
 
