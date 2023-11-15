@@ -28,25 +28,40 @@ pub enum Token {
 }
 
 pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Token, String>> + 'a {
-    let mut bite = source.chomp(parser::Chomp::whitespace());
+    let mut bite = source;
     let mut done = false;
 
+    let mut closure_stack = vec![];
+    let mut closure_stack_iter = None;
+
     std::iter::from_fn(move || {
+        bite = bite.chomp(parser::Chomp::whitespace());
+
         let has_next = !bite.is_empty() && !done;
-        has_next.then(|| {
-            let token: Result<Token, String> = tokenize_impl(&mut bite);
-            if token.is_err() {
-                done = true;
-            } else {
-                bite = bite.chomp(parser::Chomp::whitespace());
+        if !has_next {
+            // once token stream has ended append any missing open parens/brackets
+            return closure_stack_iter
+                .get_or_insert_with(|| closure_stack.clone().into_iter().map(|x| Ok(x)))
+                .next_back();
+        }
+
+        let next_token = tokenize_impl(&mut bite);
+        match &next_token {
+            Ok(Token::OpenParen) => closure_stack.push(Token::CloseParen),
+            Ok(token) if closure_stack.last() == Some(token) => {
+                closure_stack.pop();
             }
-            token
-        })
+            Err(_) => {
+                done = true;
+            }
+            _ => (),
+        }
+
+        Some(next_token)
     })
 }
 
 fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
-    *bite = bite.chomp(parser::Chomp::whitespace());
     let token = if let Some(_) = bite.nibble(parser::Chomp::literal("sin")) {
         Token::Sine
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("log")) {
@@ -85,7 +100,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Div
     } else if let Some(_) = bite.nibble(parser::Chomp::char('^')) {
         Token::Pow
-    } else if let Some(_) = bite.nibble(parser::Chomp::char('%').or(parser::Chomp::literal("mod"))) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('%').or(parser::Chomp::literal("mod")))
+    {
         Token::Mod
     } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric()) {
         Token::Identifier(indent.to_string())
