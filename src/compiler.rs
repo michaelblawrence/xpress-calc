@@ -260,7 +260,19 @@ impl<'a> Compiler<'a> {
             .peek_binary_op()
             .filter(|op| op.precedence() >= min_precedence)
         {
-            self.consume()?;
+            match self.peek() {
+                Some(Token::OpenParen) => {
+                    // handles implicit multiplication by parentheses (example: '(x+1)(x-2)')
+                }
+                Some(Token::Identifier(_)) if matches!(lhs, RecursiveExpression::Literal(_)) => {
+                    // handles implicit multiplication by literal (example: '3x')
+                }
+                Some(Token::Identifier(_)) => return None, // otherwise, token was not expected
+                _ => {
+                    self.consume()?;
+                }
+            }
+
             let mut rhs = self.compile_primary_expression()?;
 
             while let Some(_) = self
@@ -311,6 +323,9 @@ impl<'a> Compiler<'a> {
             Token::Div => Some(BinaryOp::Div),
             Token::Mod => Some(BinaryOp::Mod),
             Token::Pow => Some(BinaryOp::Pow),
+
+            Token::OpenParen => Some(BinaryOp::Mul),
+            Token::Identifier(_) => Some(BinaryOp::Mul),
             _ => None,
         }
     }

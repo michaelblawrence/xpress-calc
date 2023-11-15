@@ -256,6 +256,14 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_with_implicit_multiplication() {
+        let mut vm = VM::new();
+        assert_eq!(20.0, compute(&mut vm, "2(20 - 10)").unwrap().round());
+        assert_eq!(None, compute(&mut vm, "let x = 3"));
+        assert_eq!(16.0, compute(&mut vm, "(x)(x) + 2x + 1").unwrap().round());
+    }
+
+    #[test]
     fn can_compute_with_precedence() {
         let mut vm = VM::new();
         assert_eq!(11.0, compute(&mut vm, "2 * 3 + 5").unwrap().round());
