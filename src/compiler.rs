@@ -8,6 +8,7 @@ pub struct Compiler<'a> {
 
 #[derive(Debug)]
 enum RecursiveExpression {
+    Block(Vec<RecursiveExpression>),
     Literal(f64),
     Local(String),
     FuncDeclaration(Vec<String>, Box<RecursiveExpression>),
@@ -64,6 +65,9 @@ impl<'a> Compiler<'a> {
 
         fn delve(node: &RecursiveExpression, stream: &mut Vec<Instruction>) {
             match node {
+                RecursiveExpression::Block(statements) => {
+                    statements.iter().for_each(|node| delve(node, stream))
+                }
                 RecursiveExpression::Literal(x) => stream.push(Instruction::Push(*x)),
                 RecursiveExpression::Local(ident) => {
                     stream.push(Instruction::LoadLocal(ident.clone()))
@@ -142,6 +146,7 @@ impl<'a> Compiler<'a> {
 
     fn parse_primary_expression(&mut self) -> Option<RecursiveExpression> {
         match self.peek() {
+            Some(Token::OpenCurly) => self.parse_block(),
             Some(Token::OpenParen) => self.parse_parens_expression(),
             Some(Token::Let) => self.parse_assignment_expression(),
             Some(Token::Pi | Token::E) => self.parse_const_expression(),
@@ -205,6 +210,24 @@ impl<'a> Compiler<'a> {
         let expression = self.parse_expression()?;
         self.try_consume(&Token::CloseParen)?;
         Some(expression)
+    }
+
+    fn parse_block(&mut self) -> Option<RecursiveExpression> {
+        self.try_consume(&Token::OpenCurly)?;
+        let expression = self.parse_expression()?;
+        if let None = self.try_consume(&Token::Semicolon) {
+            return Some(expression);
+        }
+
+        let mut statements = vec![expression];
+        while let Some(expression) = self.parse_expression() {
+            statements.push(expression);
+            if let None = self.try_consume(&Token::Semicolon) {
+                break;
+            }
+        }
+        self.try_consume(&Token::CloseCurly)?;
+        Some(RecursiveExpression::Block(statements))
     }
 
     fn parse_func_expression(&mut self) -> Option<RecursiveExpression> {

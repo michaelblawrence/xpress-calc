@@ -14,6 +14,8 @@ pub enum Token {
     Log,
     OpenParen,
     CloseParen,
+    OpenCurly,
+    CloseCurly,
     Pow,
     Mod,
     Rand,
@@ -25,6 +27,7 @@ pub enum Token {
     E,
     Sqrt,
     Comma,
+    Semicolon,
 }
 
 pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Token, String>> + 'a {
@@ -84,10 +87,16 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::OpenParen
     } else if let Some(_) = bite.nibble(parser::Chomp::char(')')) {
         Token::CloseParen
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('{')) {
+        Token::OpenCurly
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('}')) {
+        Token::CloseCurly
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("=>")) {
         Token::LeftArrow
     } else if let Some(_) = bite.nibble(parser::Chomp::char(',')) {
         Token::Comma
+    } else if let Some(_) = bite.nibble(parser::Chomp::char(';')) {
+        Token::Semicolon
     } else if let Some(_) = bite.nibble(parser::Chomp::char('=')) {
         Token::Equals
     } else if let Some(_) = bite.nibble(parser::Chomp::char('+')) {

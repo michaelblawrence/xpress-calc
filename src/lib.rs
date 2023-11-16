@@ -278,6 +278,20 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_blocks() {
+        let mut vm = VM::new();
+        compute(&mut vm, "let x = { let y = 1 + 2; y + 3 }");
+        assert_eq!(6.0, compute(&mut vm, "x").unwrap().round());
+    }
+
+    #[test]
+    fn can_compute_block_fn() {
+        let mut vm = VM::new();
+        compute(&mut vm, "let calc = (x) => { let y = 2(x + 1); y^2 + y + 3 }");
+        assert_eq!(45.0, compute(&mut vm, "calc(2)").unwrap().round());
+    }
+
+    #[test]
     fn can_parse() {
         let source = parser::Bite::new("x + y = z");
         let bite = source;
