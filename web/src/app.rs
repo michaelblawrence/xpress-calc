@@ -34,17 +34,17 @@ pub fn app() -> Html {
         move |x: MouseEvent| {
             let target = x.target().unwrap();
             let elem: &web_sys::Element = target.dyn_ref().unwrap();
-            let content = elem.text_content().unwrap().chars().next().unwrap();
-            log(&format!("clicked {content}"));
+            let text = elem.text_content().unwrap();
+            let c = text.chars().last().unwrap();
+            log(&format!("clicked {text}"));
 
             if content == '⌫' {
                 if let Some((end, c)) = expression
                     .char_indices()
                     .rev()
-                    .skip(1)
-                    .find(|(_, c)| c.is_ascii_digit())
+                    .skip_while(|(i, c)| *i == 0 || c.is_whitespace())
+                    .next()
                 {
-                    let end = end + c.len_utf8();
                     expression.set(expression[..end].to_string());
                 } else {
                     expression.set(String::new());
