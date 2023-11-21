@@ -64,9 +64,10 @@ pub fn app() -> Html {
 
                     let mut vm = vm.borrow_mut();
                     match vm.run(&program).clone() {
-                        Ok(()) => match vm.pop_result() {
-                            Some(x) => ok_state(x),
-                            None => err_state("<missing-value>: undefined"),
+                        Ok(()) => match (vm.peek_routine().map(|_| ()), vm.pop_result()) {
+                            (None, Some(x)) => ok_state(x),
+                            (Some(_), _) => err_state("<nan-value>: function"),
+                            (None, None) => err_state("<missing-value>: undefined"),
                         },
                         Err(msg) => err_state(&format!("<failed-evaluation>: [{msg}]")),
                     }
