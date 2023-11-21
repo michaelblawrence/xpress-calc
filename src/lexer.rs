@@ -75,7 +75,7 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Rand
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("let")) {
         Token::Let
-    } else if let Some(_) = bite.nibble(parser::Chomp::literal("pi")) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("pi").or(parser::Chomp::char('𝜋'))) {
         Token::Pi
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("E")) {
         Token::E
@@ -113,6 +113,9 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
     {
         Token::Mod
     } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric()) {
+        Token::Identifier(indent.to_string())
+    } else if let Some(indent) = bite.nibble(parser::Chomp::char_any(&['𝒂', '𝒃', '𝒙', '𝒚']))
+    {
         Token::Identifier(indent.to_string())
     } else {
         Err(format!("Could not parse: {}", bite.as_str()))?
