@@ -77,7 +77,7 @@ pub fn app() -> Html {
 
     let onclick = Callback::from({
         let expression = expression.clone();
-        let result = result.clone();
+        let vm = vm.clone();
         move |x: MouseEvent| {
             let target = x.target().unwrap();
             let elem: &web_sys::Element = target.dyn_ref().unwrap();
@@ -85,8 +85,8 @@ pub fn app() -> Html {
             let c = text.chars().last().unwrap();
             log(&format!("clicked {text}"));
 
-            if content == '⌫' {
-                if let Some((end, c)) = expression
+            if c == '⌫' {
+                if let Some((end, _)) = expression
                     .char_indices()
                     .rev()
                     .skip_while(|(i, c)| *i == 0 || c.is_whitespace())
@@ -95,12 +95,20 @@ pub fn app() -> Html {
                     expression.set(expression[..end].to_string());
                 } else {
                     expression.set(String::new());
-                    result.set(None);
                 }
-            } else if content.is_ascii_digit() || matches!(content, 'c') {
-                expression.set(format!("{}{}", &*expression, content));
+            } else if text.as_str() == "AC" {
+                expression.set(String::new());
+            } else if text.as_str() == "CALC" {
+                xpress_calc::compute(&mut vm.borrow_mut(), &*expression);
+                expression.set(String::new());
+            } else if matches!(c, '⇒') {
+                expression.set(format!("{} => ", &*expression));
+            } else if matches!(c, '√') {
+                expression.set(format!("{} sqrt(", &*expression));
+            } else if c.is_ascii_digit() || matches!(text.as_str(), "c" | "(" | ")") {
+                expression.set(format!("{}{}", &*expression, text));
             } else {
-                expression.set(format!("{} {} ", &*expression, content));
+                expression.set(format!("{} {} ", &*expression, text));
             }
         }
     });
