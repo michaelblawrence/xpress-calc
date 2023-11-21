@@ -75,7 +75,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Rand
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("let")) {
         Token::Let
-    } else if let Some(_) = bite.nibble(parser::Chomp::literal("pi").or(parser::Chomp::char('𝜋'))) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("pi").or(parser::Chomp::char('𝜋')))
+    {
         Token::Pi
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("E")) {
         Token::E
@@ -91,7 +92,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::OpenCurly
     } else if let Some(_) = bite.nibble(parser::Chomp::char('}')) {
         Token::CloseCurly
-    } else if let Some(_) = bite.nibble(parser::Chomp::literal("=>")) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("=>").or(parser::Chomp::char('⇒')))
+    {
         Token::LeftArrow
     } else if let Some(_) = bite.nibble(parser::Chomp::char(',')) {
         Token::Comma
