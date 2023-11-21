@@ -19,6 +19,28 @@ pub enum Instruction {
     Pow,
 }
 
+impl Instruction {
+    pub fn has_side_effects(&self) -> bool {
+        match self {
+            Instruction::CallRoutine | Instruction::Assign(_) => true,
+
+            Instruction::Add
+            | Instruction::Sub
+            | Instruction::Sine
+            | Instruction::Cosine
+            | Instruction::Log
+            | Instruction::Push(_)
+            | Instruction::LoadLocal(_)
+            | Instruction::PushRoutine(_)
+            | Instruction::PushRandom
+            | Instruction::Mul
+            | Instruction::Mod
+            | Instruction::Div
+            | Instruction::Pow => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum Value {
     Number(f64),
