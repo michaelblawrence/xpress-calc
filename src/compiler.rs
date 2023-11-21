@@ -223,6 +223,7 @@ impl<'a> Compiler<'a> {
         self.try_consume(&Token::OpenCurly)?;
         let expression = self.parse_expression()?;
         if let None = self.try_consume(&Token::Semicolon) {
+            self.try_consume(&Token::CloseCurly)?;
             return Some(expression);
         }
 

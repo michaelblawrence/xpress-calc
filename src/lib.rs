@@ -12,7 +12,7 @@ pub fn compute(vm: &mut VM, input: &str) -> Option<f64> {
         Err(msg) => {
             eprintln!("{}", msg);
             return None;
-        },
+        }
     };
 
     match vm.run(&program) {
@@ -295,8 +295,16 @@ mod tests {
     #[test]
     fn can_compute_block_fn() {
         let mut vm = VM::new();
-        compute(&mut vm, "let calc = (x) => { let y = 2(x + 1); y^2 + y + 3 }");
+        compute(
+            &mut vm,
+            "let calc = (x) => { let y = 2(x + 1); y^2 + y + 3 }",
+        );
         assert_eq!(45.0, compute(&mut vm, "calc(2)").unwrap().round());
+
+        compute(&mut vm, "let y = 15");
+        compute(&mut vm, "let calc2 = ( x ) => { let y = y * x }");
+        assert_eq!(None, compute(&mut vm, "calc2(3)"));
+        assert_eq!(45.0, compute(&mut vm, "y").unwrap().round());
     }
 
     #[test]
