@@ -105,8 +105,9 @@ pub fn app() -> Html {
                 expression.set(String::new());
             } else if text.as_str() == "CALC" {
                 if !*invalid_state {
-                    xpress_calc::compute(&mut vm.borrow_mut(), &*expression);
-                    expression.set(String::new());
+                    let result = xpress_calc::compute(&mut vm.borrow_mut(), &*expression);
+                    let next_expression = result.map_or_else(|| String::new(), |x| x.to_string());
+                    expression.set(next_expression);
                 }
             } else if matches!(c, '√') {
                 expression.set(format!("{} sqrt(", &*expression));
