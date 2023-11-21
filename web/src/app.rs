@@ -20,12 +20,58 @@ pub fn app() -> Html {
 
     use_effect_with(expression.clone(), {
         let result = result.clone();
-        move |expression| match xpress_calc::compute(&mut vm.borrow_mut(), &*expression) {
-            Some(x) => {
-                log(&format!("{x}"));
+        let vm = vm.clone();
+        let invalid_state = invalid_state.clone();
+        let ok_state = {
+            let result = result.clone();
+            let invalid_state = invalid_state.clone();
+            move |x: f64| {
+                log(&format!("<computed>: {x}"));
                 result.set(Some(x));
+                invalid_state.set(false);
             }
-            None => log("<undefined>"),
+        };
+        let lazy_state = {
+            let invalid_state = invalid_state.clone();
+            move |msg: &str| {
+                log(msg);
+                invalid_state.set(false);
+            }
+        };
+        let err_state = {
+            let invalid_state = invalid_state.clone();
+            move |msg: &str| {
+                log(msg);
+                invalid_state.set(true);
+            }
+        };
+        move |expression| {
+            if expression.is_empty() {
+                invalid_state.set(false);
+                result.set(None);
+                return;
+            }
+            match xpress_calc::compile(&*expression) {
+                Ok(program) => {
+                    if program.iter().any(|x| x.has_side_effects()) {
+                        lazy_state(
+                            "expression may have side-effects, skipping immediate evaluation...",
+                        );
+                        result.set(None);
+                        return;
+                    }
+
+                    let mut vm = vm.borrow_mut();
+                    match vm.run(&program).clone() {
+                        Ok(()) => match vm.pop_result() {
+                            Some(x) => ok_state(x),
+                            None => err_state("<missing-value>: undefined"),
+                        },
+                        Err(msg) => err_state(&format!("<failed-evaluation>: [{msg}]")),
+                    }
+                }
+                Err(msg) => err_state(&format!("<failed-compilation>: [{msg}]")),
+            }
         }
     });
 
