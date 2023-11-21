@@ -63,6 +63,13 @@ impl<'a> Compiler<'a> {
             .parse_expression()
             .ok_or_else(|| format!("empty program expression!"))?;
 
+        if self.position != self.program.len() {
+            return Err(format!(
+                "failed to compile remaining tokens: {:?}",
+                &self.program[self.position..]
+            ));
+        }
+
         fn delve(node: &RecursiveExpression, stream: &mut Vec<Instruction>) {
             match node {
                 RecursiveExpression::Block(statements) => {
