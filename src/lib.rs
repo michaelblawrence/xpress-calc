@@ -332,6 +332,24 @@ mod tests {
         assert_eq!(&[lhs, op, rhs, eq, result], &["x", "+", "y", "=", "z"]);
     }
 
+    pub fn compute(vm: &mut VM, input: &str) -> Option<f64> {
+        let program = match compile(input) {
+            Ok(value) => value,
+            Err(msg) => {
+                panic!("{}", msg);
+            }
+        };
+
+        match vm.run(&program) {
+            Ok(_) => {}
+            Err(err) => {
+                panic!("ERROR: could not compute expression: {err}");
+            }
+        }
+
+        vm.pop_result()
+    }
+
     fn instr_iter(input: &str) -> Vec<Instruction> {
         let tokens: Result<Vec<_>, _> = lexer::tokenize(input.into()).collect();
         let tokens = dbg!(tokens.unwrap());
