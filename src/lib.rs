@@ -7,23 +7,12 @@ pub mod parser;
 pub mod vm;
 
 pub fn compute(vm: &mut VM, input: &str) -> Option<f64> {
-    let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
-    let tokens = lexer::tokenize(source).collect();
-
-    let tokens: Vec<_> = match tokens {
-        Ok(x) => x,
-        Err(err) => {
-            eprintln!("ERROR: could not interpret input tokens: {err}");
+    let program = match compile(input) {
+        Ok(value) => value,
+        Err(msg) => {
+            eprintln!("{}", msg);
             return None;
-        }
-    };
-    let mut compiler = Compiler::new(&tokens);
-    let program = match compiler.compile() {
-        Ok(x) => x,
-        Err(err) => {
-            eprintln!("ERROR: could not compile program: {err}");
-            return None;
-        }
+        },
     };
 
     match vm.run(&program) {
@@ -35,6 +24,25 @@ pub fn compute(vm: &mut VM, input: &str) -> Option<f64> {
     }
 
     vm.pop_result()
+}
+
+pub fn compile(input: &str) -> Result<Vec<vm::Instruction>, String> {
+    let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
+    let tokens = lexer::tokenize(source).collect();
+    let tokens: Vec<_> = match tokens {
+        Ok(x) => x,
+        Err(err) => {
+            return Err(format!("ERROR: could not interpret input tokens: {err}"));
+        }
+    };
+    let mut compiler = Compiler::new(&tokens);
+    let program = match compiler.compile() {
+        Ok(x) => x,
+        Err(err) => {
+            return Err(format!("ERROR: could not compile program: {err}"));
+        }
+    };
+    Ok(program)
 }
 
 #[cfg(test)]
