@@ -68,10 +68,10 @@ mod tests {
 
         assert_eq!(
             Some(Instruction::PushRoutine(vec![
-                Instruction::Assign(String::from("_x")),
-                Instruction::LoadLocal(String::from("_x")),
+                Instruction::ShadowAssign(String::from("x")),
+                Instruction::LoadLocal(String::from("x")),
                 Instruction::Sine,
-                Instruction::LoadLocal(String::from("_x")),
+                Instruction::LoadLocal(String::from("x")),
                 Instruction::Add
             ])),
             instructions.next()

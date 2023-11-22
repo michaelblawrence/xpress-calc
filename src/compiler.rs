@@ -70,10 +70,15 @@ impl<'a> Compiler<'a> {
             ));
         }
 
+        let mut instruction_stream = vec![];
+        delve(&program_expression, &mut instruction_stream);
+
         fn delve(node: &RecursiveExpression, stream: &mut Vec<Instruction>) {
             match node {
                 RecursiveExpression::Block(statements) => {
-                    statements.iter().for_each(|node| delve(node, stream))
+                    stream.push(Instruction::Enter);
+                    statements.iter().for_each(|node| delve(node, stream));
+                    stream.push(Instruction::Leave);
                 }
                 RecursiveExpression::Literal(x) => stream.push(Instruction::Push(*x)),
                 RecursiveExpression::Local(ident) => {
@@ -84,16 +89,8 @@ impl<'a> Compiler<'a> {
                     delve(body, &mut routine);
                     let routine = params
                         .iter()
-                        .map(|ident| Instruction::Assign(format!("_{ident}")))
-                        .chain(routine.into_iter().map(|instr| match instr {
-                            Instruction::LoadLocal(ident) if params.contains(&ident) => {
-                                Instruction::LoadLocal(format!("_{ident}"))
-                            }
-                            Instruction::Assign(ident) if params.contains(&ident) => {
-                                Instruction::Assign(format!("_{ident}"))
-                            }
-                            instr => instr,
-                        }))
+                        .map(|ident| Instruction::ShadowAssign(ident.clone()))
+                        .chain(routine.into_iter())
                         .collect();
                     stream.push(Instruction::PushRoutine(routine))
                 }
@@ -135,9 +132,6 @@ impl<'a> Compiler<'a> {
                 }
             }
         }
-
-        let mut instruction_stream = vec![];
-        delve(&program_expression, &mut instruction_stream);
 
         Ok(instruction_stream)
     }
@@ -222,16 +216,13 @@ impl<'a> Compiler<'a> {
     fn parse_block(&mut self) -> Option<RecursiveExpression> {
         self.try_consume(&Token::OpenCurly)?;
         let expression = self.parse_expression()?;
-        if let None = self.try_consume(&Token::Semicolon) {
-            self.try_consume(&Token::CloseCurly)?;
-            return Some(expression);
-        }
-
         let mut statements = vec![expression];
-        while let Some(expression) = self.parse_expression() {
-            statements.push(expression);
-            if let None = self.try_consume(&Token::Semicolon) {
-                break;
+        if let Some(_) = self.try_consume(&Token::Semicolon) {
+            while let Some(expression) = self.parse_expression() {
+                statements.push(expression);
+                if let None = self.try_consume(&Token::Semicolon) {
+                    break;
+                }
             }
         }
         self.try_consume(&Token::CloseCurly)?;
