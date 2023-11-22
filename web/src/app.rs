@@ -148,7 +148,7 @@ pub fn app() -> Html {
         }
     };
     html! {
-        <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-cyan-900","select-none","shadow-lg","border","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
+        <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-cyan-900","select-none","shadow-lg","border","border-cyan-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
             <div>
             <div class={classes!("p-5","text-white","text-center","text-3xl","bg-cyan-900")}><span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}</div>
             <div class={classes!("pt-12","p-5","pb-0","h-20","select-text","text-white","text-right","text-3xl","bg-cyan-800")}>{ expression }</div>
