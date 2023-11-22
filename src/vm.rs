@@ -9,6 +9,7 @@ pub enum Instruction {
     Log,
     Push(f64),
     Assign(String),
+    ShadowAssign(String),
     LoadLocal(String),
     CallRoutine,
     PushRoutine(Vec<Instruction>),
@@ -17,26 +18,32 @@ pub enum Instruction {
     Mod,
     Div,
     Pow,
+    Enter,
+    Leave,
 }
 
 impl Instruction {
     pub fn has_side_effects(&self) -> bool {
         match self {
-            Instruction::CallRoutine | Instruction::Assign(_) => true,
+            Self::CallRoutine
+            | Self::Assign(_)
+            | Self::ShadowAssign(_)
+            | Self::Enter
+            | Self::Leave => true,
 
-            Instruction::Add
-            | Instruction::Sub
-            | Instruction::Sine
-            | Instruction::Cosine
-            | Instruction::Log
-            | Instruction::Push(_)
-            | Instruction::LoadLocal(_)
-            | Instruction::PushRoutine(_)
-            | Instruction::PushRandom
-            | Instruction::Mul
-            | Instruction::Mod
-            | Instruction::Div
-            | Instruction::Pow => false,
+            Self::Add
+            | Self::Sub
+            | Self::Sine
+            | Self::Cosine
+            | Self::Log
+            | Self::Push(_)
+            | Self::LoadLocal(_)
+            | Self::PushRoutine(_)
+            | Self::PushRandom
+            | Self::Mul
+            | Self::Mod
+            | Self::Div
+            | Self::Pow => false,
         }
     }
 }
@@ -72,7 +79,7 @@ impl From<f64> for Value {
 #[derive(Debug, Default)]
 pub struct VM {
     stack: Vec<Value>,
-    locals: Vec<(String, Value)>,
+    scopes: ScopeStack,
     rng: Rand,
 }
 
@@ -80,6 +87,7 @@ impl VM {
     pub fn new() -> Self {
         Self::default()
     }
+
     pub fn run(&mut self, program: &[Instruction]) -> Result<(), String> {
         for instruction in program {
             match instruction {
@@ -91,6 +99,7 @@ impl VM {
                 Instruction::Push(x) => self.push(*x),
                 Instruction::LoadLocal(ident) => self.load_local(&ident),
                 Instruction::Assign(ident) => self.assign(ident),
+                Instruction::ShadowAssign(ident) => self.shadow_assign(ident),
                 Instruction::CallRoutine => self.call_routine()?,
                 Instruction::PushRoutine(routine) => self.push(routine.to_vec()),
                 Instruction::PushRandom => self.push(self.rng.rand()),
@@ -98,11 +107,13 @@ impl VM {
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs),
                 Instruction::Mod => self.binary_op(|lhs, rhs| lhs % rhs),
                 Instruction::Pow => self.binary_op(|lhs, rhs| lhs.powf(rhs)),
+                Instruction::Enter => self.scopes.push(),
+                Instruction::Leave => self.scopes.pop(),
             }
         }
-
         Ok(())
     }
+
     pub fn pop_result(&mut self) -> Option<f64> {
         match self.stack.pop() {
             Some(result) => Some(result.as_number()),
@@ -110,6 +121,13 @@ impl VM {
                 dbg!(self);
                 None
             }
+        }
+    }
+
+    pub fn peek_routine(&mut self) -> Option<&[Instruction]> {
+        match self.stack.last() {
+            Some(Value::Routine(routine)) => Some(routine.as_slice()),
+            _ => None,
         }
     }
 
@@ -130,11 +148,7 @@ impl VM {
     }
 
     fn load_local(&mut self, identifier: &str) {
-        let x = self
-            .locals
-            .iter()
-            .find(|(ident, _)| ident == identifier)
-            .map(|(_, x)| x.clone());
+        let x = self.scopes.get(identifier).map(|(_, x)| x.clone());
 
         let x = x.unwrap_or_else(|| {
             eprintln!("WARN: missing variable '{identifier}'");
@@ -146,21 +160,32 @@ impl VM {
 
     fn assign(&mut self, identifier: &str) {
         let value = self.stack.pop().expect("missing assignment value");
-        if let Some((_, x)) = self
-            .locals
-            .iter_mut()
-            .find(|(ident, _)| ident == identifier)
-        {
+        if let Some((_, x)) = self.scopes.get_mut(identifier) {
             *x = value;
             return;
         }
 
-        self.locals.push((identifier.to_string(), value));
+        self.scopes
+            .put(identifier.to_string(), value)
+            .expect("failed to put local");
+    }
+
+    fn shadow_assign(&mut self, identifier: &str) {
+        let value = self.stack.pop().expect("missing assignment value");
+
+        self.scopes
+            .put(identifier.to_string(), value)
+            .expect("failed to put local");
     }
 
     fn call_routine(&mut self) -> Result<(), String> {
         match self.stack.pop() {
-            Some(Value::Routine(routine)) => self.run(&routine),
+            Some(Value::Routine(routine)) => {
+                self.scopes.push();
+                let result = self.run(&routine);
+                self.scopes.pop();
+                result
+            }
             Some(x) => {
                 eprintln!("WARN: current value is not callable '{x:?}'");
                 Ok(())
@@ -169,6 +194,55 @@ impl VM {
                 eprintln!("WARN: no current value to call");
                 Ok(())
             }
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct LocalScope(Vec<(String, Value)>);
+
+#[derive(Debug)]
+struct ScopeStack(Vec<LocalScope>);
+
+impl Default for ScopeStack {
+    fn default() -> Self {
+        Self(vec![Default::default()])
+    }
+}
+
+impl ScopeStack {
+    fn get(&self, name: &str) -> Option<&(String, Value)> {
+        let (layer_idx, local_idx) = self.position(name)?;
+        let locals = self.0.get(layer_idx)?;
+        locals.0.get(local_idx)
+    }
+    fn get_mut(&mut self, name: &str) -> Option<&mut (String, Value)> {
+        let (layer_idx, local_idx) = self.position(name)?;
+        let locals = self.0.get_mut(layer_idx)?;
+        locals.0.get_mut(local_idx)
+    }
+    fn position(&self, name: &str) -> Option<(usize, usize)> {
+        for (layer_idx, locals) in self.0.iter().enumerate().rev() {
+            if let Some(local_idx) = locals.0.iter().position(|(x, _)| &*x == name) {
+                return Some((layer_idx, local_idx));
+            }
+        }
+        None
+    }
+    pub fn push(&mut self) {
+        self.0.push(Default::default())
+    }
+    pub fn pop(&mut self) {
+        self.0.pop();
+    }
+    pub fn put(&mut self, name: String, value: Value) -> Result<bool, ()> {
+        let locals = self.0.last_mut().ok_or(())?;
+        if let Some((_, x)) = locals.0.iter_mut().find(|(x, _)| x == &name) {
+            *x = value;
+            Ok(true)
+        } else {
+            locals.0.push((name, value));
+            Ok(false)
         }
     }
 }
