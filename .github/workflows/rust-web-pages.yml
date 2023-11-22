@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: "18.x"
       - name: Use tailwindcss
-        run: npm install -D tailwindcss
+        run: npm install -g tailwindcss
 
       - name: Add wasm target
         run: |
