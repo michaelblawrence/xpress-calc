@@ -76,11 +76,11 @@ impl From<f64> for Value {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct VM {
     stack: Vec<Value>,
     scopes: ScopeStack,
-    rng: Rand,
+    rng: Rc<Rand>,
 }
 
 impl VM {
@@ -91,22 +91,22 @@ impl VM {
     pub fn run(&mut self, program: &[Instruction]) -> Result<(), String> {
         for instruction in program {
             match instruction {
-                Instruction::Add => self.binary_op(|lhs, rhs| lhs + rhs),
-                Instruction::Sub => self.binary_op(|lhs, rhs| lhs - rhs),
-                Instruction::Sine => self.uanry_op(|x| x.to_radians().sin()),
-                Instruction::Cosine => self.uanry_op(|x| x.to_radians().cos()),
-                Instruction::Log => self.uanry_op(|x| x.log10()),
+                Instruction::Add => self.binary_op(|lhs, rhs| lhs + rhs)?,
+                Instruction::Sub => self.binary_op(|lhs, rhs| lhs - rhs)?,
+                Instruction::Sine => self.uanry_op(|x| x.to_radians().sin())?,
+                Instruction::Cosine => self.uanry_op(|x| x.to_radians().cos())?,
+                Instruction::Log => self.uanry_op(|x| x.log10())?,
                 Instruction::Push(x) => self.push(*x),
                 Instruction::LoadLocal(ident) => self.load_local(&ident),
-                Instruction::Assign(ident) => self.assign(ident),
-                Instruction::ShadowAssign(ident) => self.shadow_assign(ident),
+                Instruction::Assign(ident) => self.assign(ident)?,
+                Instruction::ShadowAssign(ident) => self.shadow_assign(ident)?,
                 Instruction::CallRoutine => self.call_routine()?,
                 Instruction::PushRoutine(routine) => self.push(routine.to_vec()),
                 Instruction::PushRandom => self.push(self.rng.rand()),
-                Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs),
-                Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs),
-                Instruction::Mod => self.binary_op(|lhs, rhs| lhs % rhs),
-                Instruction::Pow => self.binary_op(|lhs, rhs| lhs.powf(rhs)),
+                Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs)?,
+                Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs)?,
+                Instruction::Mod => self.binary_op(|lhs, rhs| lhs % rhs)?,
+                Instruction::Pow => self.binary_op(|lhs, rhs| lhs.powf(rhs))?,
                 Instruction::Enter => self.scopes.push(),
                 Instruction::Leave => self.scopes.pop(),
             }
@@ -131,16 +131,24 @@ impl VM {
         }
     }
 
-    fn uanry_op(&mut self, op: impl FnOnce(f64) -> f64) {
-        let result = op(self.stack.pop().expect("missing operand").as_number());
+    fn uanry_op(&mut self, op: impl FnOnce(f64) -> f64) -> Result<(), String> {
+        let operand = self.stack.pop();
+        let operand = operand
+            .ok_or_else(|| String::from("missing operand"))?
+            .as_number();
+        let result = op(operand);
         self.stack.push(result.into());
+        Ok(())
     }
 
-    fn binary_op(&mut self, op: impl FnOnce(f64, f64) -> f64) {
-        let rhs = self.stack.pop().expect("missing rhs").as_number();
-        let lhs = self.stack.pop().expect("missing lhs").as_number();
+    fn binary_op(&mut self, op: impl FnOnce(f64, f64) -> f64) -> Result<(), String> {
+        let rhs = self.stack.pop();
+        let rhs = rhs.ok_or_else(|| String::from("missing rhs"))?.as_number();
+        let lhs = self.stack.pop();
+        let lhs = lhs.ok_or_else(|| String::from("missing lhs"))?.as_number();
         let result = op(lhs, rhs);
         self.stack.push(result.into());
+        Ok(())
     }
 
     fn push(&mut self, x: impl Into<Value>) {
@@ -158,24 +166,28 @@ impl VM {
         self.stack.push(x.into());
     }
 
-    fn assign(&mut self, identifier: &str) {
-        let value = self.stack.pop().expect("missing assignment value");
+    fn assign(&mut self, identifier: &str) -> Result<(), String> {
+        let value = self.stack.pop();
+        let value = value.ok_or_else(|| String::from("missing assignment value"))?;
         if let Some((_, x)) = self.scopes.get_mut(identifier) {
             *x = value;
-            return;
+            return Ok(());
         }
 
         self.scopes
             .put(identifier.to_string(), value)
             .expect("failed to put local");
+        Ok(())
     }
 
-    fn shadow_assign(&mut self, identifier: &str) {
-        let value = self.stack.pop().expect("missing assignment value");
+    fn shadow_assign(&mut self, identifier: &str) -> Result<(), String> {
+        let value = self.stack.pop();
+        let value = value.ok_or_else(|| String::from("missing assignment value"))?;
 
         self.scopes
             .put(identifier.to_string(), value)
             .expect("failed to put local");
+        Ok(())
     }
 
     fn call_routine(&mut self) -> Result<(), String> {
@@ -198,10 +210,10 @@ impl VM {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 struct LocalScope(Vec<(String, Value)>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ScopeStack(Vec<LocalScope>);
 
 impl Default for ScopeStack {
