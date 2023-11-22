@@ -54,20 +54,15 @@ pub fn app() -> Html {
             }
             match xpress_calc::compile(&*expression) {
                 Ok(program) => {
-                    if program.iter().any(|x| x.has_side_effects()) {
-                        lazy_state(
-                            "expression may have side-effects, skipping immediate evaluation...",
-                        );
-                        result.set(None);
-                        return;
-                    }
-
-                    let mut vm = vm.borrow_mut();
+                    let mut vm = vm.borrow().clone();
                     match vm.run(&program).clone() {
                         Ok(()) => match (vm.peek_routine().map(|_| ()), vm.pop_result()) {
                             (None, Some(x)) => ok_state(x),
                             (Some(_), _) => err_state("<nan-value>: function"),
-                            (None, None) => err_state("<missing-value>: undefined"),
+                            (None, None) => {
+                                log("<missing-value>: undefined");
+                                invalid_state.set(false);
+                            }
                         },
                         Err(msg) => err_state(&format!("<failed-evaluation>: [{msg}]")),
                     }
