@@ -51,6 +51,7 @@ pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Tok
         let next_token = tokenize_impl(&mut bite);
         match &next_token {
             Ok(Token::OpenParen) => closure_stack.push(Token::CloseParen),
+            Ok(Token::OpenCurly) => closure_stack.push(Token::CloseCurly),
             Ok(token) if closure_stack.last() == Some(token) => {
                 closure_stack.pop();
             }
