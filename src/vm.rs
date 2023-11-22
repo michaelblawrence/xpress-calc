@@ -127,21 +127,14 @@ impl VM {
             }
         }
     }
+
+    pub fn peek_routine(&mut self) -> Option<&[Instruction]> {
+        match self.stack.last() {
+            Some(Value::Routine(routine)) => Some(routine.as_slice()),
+            _ => None,
+        }
+    }
     
-    pub fn peek_routine(&mut self) -> Option<&[Instruction]> {
-        match self.stack.last() {
-            Some(Value::Routine(routine)) => Some(routine.as_slice()),
-            _ => None,
-        }
-    }
-
-    pub fn peek_routine(&mut self) -> Option<&[Instruction]> {
-        match self.stack.last() {
-            Some(Value::Routine(routine)) => Some(routine.as_slice()),
-            _ => None,
-        }
-    }
-
     fn unary_op(&mut self, op: impl FnOnce(f64) -> f64) -> Result<(), String> {
         let operand = self.stack.pop();
         let operand = operand
