@@ -1,0 +1,15 @@
+{
+    "name": "xpressCALC",
+    "short_name": "xpressCALC",
+    "icons": [
+        {
+            "src": "/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#155e75",
+    "background_color": "#164e63",
+    "start_url": "https://michaelblawrence.github.io/xpress-calc/",
+    "display": "standalone"
+}
