@@ -142,6 +142,15 @@ pub fn app() -> Html {
             </div>
         }
     };
+    let main_btn_ref = &main_btn;
+    let shift_mode_clone = shift_mode.clone();
+    let main_btn_dual = move |normal_label: &str, shift_label: &str| {
+        if *shift_mode_clone {
+            main_btn_ref(shift_label)
+        } else {
+            main_btn_ref(normal_label)
+        }
+    };
     html! {
         <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-cyan-900","select-none","shadow-lg","border","border-cyan-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
             <div>
@@ -168,8 +177,8 @@ pub fn app() -> Html {
             {mini_btn("⇒")}
             {mini_btn_dual("𝒂", "f")}
             {mini_btn_dual("𝒃", "g")}
-            {mini_btn("√")}
-            {mini_btn("𝜋")}
+            {mini_btn_dual("%", "√")}
+            {mini_btn_dual(";", "𝜋")}
             {mini_btn("⇪")}
         </div>
 
@@ -179,13 +188,13 @@ pub fn app() -> Html {
             {mini_btn_dual("𝒚", "j")}
             {mini_btn_dual("<", "{")}
             {mini_btn_dual(">", "}")}
-            {mini_btn_dual("=", ";")}
+            {mini_btn("=")}
         </div>
 
         <div class={classes!("flex","items-stretch","bg-cyan-900","h-24")}>
-            {main_btn("AC")}
-            {main_btn("(")}
-            {main_btn(")")}
+            {main_btn_dual("AC", "📋")}
+            {main_btn_dual("(", "{")}
+            {main_btn_dual(")", "}")}
             {main_btn("÷")}
         </div>
 
