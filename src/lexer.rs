@@ -22,6 +22,10 @@ pub enum Token {
     Identifier(String),
     Let,
     LeftArrow,
+    LessThan,
+    LessThanEquals,
+    GreaterThan,
+    GreaterThanEquals,
     Equals,
     Pi,
     E,
@@ -102,6 +106,16 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Semicolon
     } else if let Some(_) = bite.nibble(parser::Chomp::char('=')) {
         Token::Equals
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("<=").or(parser::Chomp::char('≤')))
+    {
+        Token::LessThanEquals
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('<')) {
+        Token::LessThan
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal(">=").or(parser::Chomp::char('≥')))
+    {
+        Token::GreaterThanEquals
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('>')) {
+        Token::GreaterThan
     } else if let Some(_) = bite.nibble(parser::Chomp::char('+')) {
         Token::Plus
     } else if let Some(_) = bite.nibble(parser::Chomp::char('-')) {

@@ -20,6 +20,10 @@ pub enum Instruction {
     Pow,
     Enter,
     Leave,
+    CmpLT,
+    CmpLTE,
+    CmpGT,
+    CmpGTE,
 }
 
 #[derive(Debug, Clone)]
@@ -81,6 +85,10 @@ impl VM {
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs)?,
                 Instruction::Mod => self.binary_op(|lhs, rhs| lhs % rhs)?,
                 Instruction::Pow => self.binary_op(|lhs, rhs| lhs.powf(rhs))?,
+                Instruction::CmpLT => self.binary_op(|lhs, rhs| (lhs < rhs) as u8 as f64)?,
+                Instruction::CmpLTE => self.binary_op(|lhs, rhs| (lhs <= rhs) as u8 as f64)?,
+                Instruction::CmpGT => self.binary_op(|lhs, rhs| (lhs > rhs) as u8 as f64)?,
+                Instruction::CmpGTE => self.binary_op(|lhs, rhs| (lhs >= rhs) as u8 as f64)?,
                 Instruction::Enter => self.scopes.push(),
                 Instruction::Leave => self.scopes.pop(),
             }

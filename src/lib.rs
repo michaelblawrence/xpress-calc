@@ -222,6 +222,30 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_lt() {
+        let mut vm = VM::new();
+        assert_eq!(0.0, compute(&mut vm, "3 < 2").unwrap().round());
+        assert_eq!(0.0, compute(&mut vm, "2 < 2").unwrap().round());
+        assert_eq!(1.0, compute(&mut vm, "1 < 2").unwrap().round());
+        
+        assert_eq!(0.0, compute(&mut vm, "3 <= 2").unwrap().round());
+        assert_eq!(1.0, compute(&mut vm, "2 <= 2").unwrap().round());
+        assert_eq!(1.0, compute(&mut vm, "1 <= 2").unwrap().round());
+    }
+
+    #[test]
+    fn can_compute_gt() {
+        let mut vm = VM::new();
+        assert_eq!(1.0, compute(&mut vm, "3 > 2").unwrap().round());
+        assert_eq!(0.0, compute(&mut vm, "2 > 2").unwrap().round());
+        assert_eq!(0.0, compute(&mut vm, "1 > 2").unwrap().round());
+        
+        assert_eq!(1.0, compute(&mut vm, "3 >= 2").unwrap().round());
+        assert_eq!(1.0, compute(&mut vm, "2 >= 2").unwrap().round());
+        assert_eq!(0.0, compute(&mut vm, "1 >= 2").unwrap().round());
+    }
+
+    #[test]
     fn can_compute_sqrt() {
         let mut vm = VM::new();
         assert_eq!(10.0, compute(&mut vm, "sqrt(100)").unwrap().round());

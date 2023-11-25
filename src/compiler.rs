@@ -26,14 +26,19 @@ enum BinaryOp {
     Mul,
     Mod,
     Pow,
+    LT,
+    LTE,
+    GT,
+    GTE,
 }
 
 impl BinaryOp {
     fn precedence(&self) -> usize {
         match self {
-            Self::Pow | Self::Mod => 2,
-            Self::Mul | Self::Div => 1,
-            Self::Add | Self::Sub => 0,
+            Self::Pow | Self::Mod => 3,
+            Self::Mul | Self::Div => 2,
+            Self::Add | Self::Sub => 1,
+            Self::LT | Self::LTE | Self::GT | Self::GTE => 0,
         }
     }
 }
@@ -108,6 +113,10 @@ impl<'a> Compiler<'a> {
                         BinaryOp::Mul => stream.push(Instruction::Mul),
                         BinaryOp::Mod => stream.push(Instruction::Mod),
                         BinaryOp::Pow => stream.push(Instruction::Pow),
+                        BinaryOp::LT => stream.push(Instruction::CmpLT),
+                        BinaryOp::LTE => stream.push(Instruction::CmpLTE),
+                        BinaryOp::GT => stream.push(Instruction::CmpGT),
+                        BinaryOp::GTE => stream.push(Instruction::CmpGTE),
                     }
                 }
                 RecursiveExpression::Func0(op) => match op {
@@ -345,6 +354,10 @@ impl<'a> Compiler<'a> {
             Token::Div => Some(BinaryOp::Div),
             Token::Mod => Some(BinaryOp::Mod),
             Token::Pow => Some(BinaryOp::Pow),
+            Token::LessThan => Some(BinaryOp::LT),
+            Token::LessThanEquals => Some(BinaryOp::LTE),
+            Token::GreaterThan => Some(BinaryOp::GT),
+            Token::GreaterThanEquals => Some(BinaryOp::GTE),
 
             Token::OpenParen => Some(BinaryOp::Mul),
             Token::Identifier(_) => Some(BinaryOp::Mul),
