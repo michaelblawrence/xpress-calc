@@ -12,6 +12,7 @@ enum RecursiveExpression {
     Literal(f64),
     Local(String),
     FuncDeclaration(Vec<String>, Box<RecursiveExpression>),
+    If(Box<RecursiveExpression>, Box<RecursiveExpression>),
     AssignOp(String, Box<RecursiveExpression>),
     BinaryOp(Box<RecursiveExpression>, BinaryOp, Box<RecursiveExpression>),
     Func0(Func0Op),
@@ -97,7 +98,13 @@ impl<'a> Compiler<'a> {
                         .map(|ident| Instruction::ShadowAssign(ident.clone()))
                         .chain(routine.into_iter())
                         .collect();
-                    stream.push(Instruction::PushRoutine(routine))
+                    stream.push(Instruction::PushRoutine(routine));
+                }
+                RecursiveExpression::If(condition, block) => {
+                    delve(condition, stream);
+                    let mut routine = vec![];
+                    delve(block, &mut routine);
+                    stream.push(Instruction::SkipIfNot(routine));
                 }
                 RecursiveExpression::AssignOp(ident, value) => {
                     delve(value, stream);
@@ -159,6 +166,7 @@ impl<'a> Compiler<'a> {
             Some(Token::OpenCurly) => self.parse_block(),
             Some(Token::OpenParen) => self.parse_parens_expression(),
             Some(Token::Let) => self.parse_assignment_expression(),
+            Some(Token::If) => self.parse_if_expression(),
             Some(Token::Pi | Token::E) => self.parse_const_expression(),
             Some(Token::LiteralNum(_)) => self.parse_literal_expression(),
             Some(Token::Identifier(_)) => self.parse_var_expression(),
@@ -262,6 +270,18 @@ impl<'a> Compiler<'a> {
         Some(RecursiveExpression::AssignOp(
             identifier,
             Box::new(expression),
+        ))
+    }
+
+    fn parse_if_expression(&mut self) -> Option<RecursiveExpression> {
+        self.try_consume(&Token::If)?;
+        self.try_consume(&Token::OpenParen)?;
+        let expression = self.parse_expression()?;
+        self.try_consume(&Token::CloseParen)?;
+        let block = self.parse_block()?;
+        Some(RecursiveExpression::If(
+            Box::new(expression),
+            Box::new(block),
         ))
     }
 

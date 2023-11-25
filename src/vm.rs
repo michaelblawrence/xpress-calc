@@ -13,17 +13,18 @@ pub enum Instruction {
     LoadLocal(String),
     CallRoutine,
     PushRoutine(Vec<Instruction>),
+    SkipIfNot(Vec<Instruction>),
     PushRandom,
     Mul,
     Mod,
     Div,
     Pow,
-    Enter,
-    Leave,
     CmpLT,
     CmpLTE,
     CmpGT,
     CmpGTE,
+    Enter,
+    Leave,
 }
 
 #[derive(Debug, Clone)]
@@ -80,6 +81,7 @@ impl VM {
                 Instruction::ShadowAssign(ident) => self.shadow_assign(ident)?,
                 Instruction::CallRoutine => self.call_routine()?,
                 Instruction::PushRoutine(routine) => self.push(routine.to_vec()),
+                Instruction::SkipIfNot(block) => self.conditional(|x| x != 0.0, block)?,
                 Instruction::PushRandom => self.push(self.rng.rand()),
                 Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs)?,
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs)?,
@@ -130,6 +132,21 @@ impl VM {
         let lhs = lhs.ok_or_else(|| String::from("missing lhs"))?.as_number();
         let result = op(lhs, rhs);
         self.stack.push(result.into());
+        Ok(())
+    }
+
+    fn conditional(
+        &mut self,
+        op: impl FnOnce(f64) -> bool,
+        block: &[Instruction],
+    ) -> Result<(), String> {
+        let operand = self.stack.pop();
+        let operand = operand
+            .ok_or_else(|| String::from("missing operand"))?
+            .as_number();
+        if op(operand) {
+            self.run(block)?;
+        }
         Ok(())
     }
 

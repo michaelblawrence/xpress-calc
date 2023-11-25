@@ -246,6 +246,13 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_if_statements() {
+        let mut vm = VM::new();
+        assert_eq!(0.0, compute(&mut vm, "{let x = 0; if (3 < 2) { let x = 3 }; x}").unwrap().round());
+        assert_eq!(3.0, compute(&mut vm, "{let x = 0; if (3 > 2) { let x = 3 }; x}").unwrap().round());
+    }
+
+    #[test]
     fn can_compute_sqrt() {
         let mut vm = VM::new();
         assert_eq!(10.0, compute(&mut vm, "sqrt(100)").unwrap().round());
