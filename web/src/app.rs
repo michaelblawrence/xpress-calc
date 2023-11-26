@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use wasm_bindgen::prelude::*;
+use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 use xpress_calc::vm::VM;
@@ -88,6 +89,18 @@ pub fn app() -> Html {
                 }
             } else if c == '⇪' {
                 shift_mode.set(!*shift_mode);
+            } else if text.as_str() == "ABC" {
+                if let Err(e) = browser_sys::show_virtual_kb() {
+                    log(&format!("ERROR on show_virtual_kb: {e}"))
+                }
+            } else if c == '📋' {
+                let expression = expression.clone();
+                let on_paste = move |s: JsValue| {
+                    expression.set(format!("{}{}", &*expression, s.as_string().unwrap()))
+                };
+                if let Err(e) = browser_sys::paste_clipboard(on_paste) {
+                    log(&format!("ERROR on paste_clipboard: {e}"))
+                }
             } else if text.as_str() == "AC" {
                 expression.set(String::new());
             } else if text.as_str() == "CALC" {
@@ -106,12 +119,23 @@ pub fn app() -> Html {
         }
     });
 
+    let onmousedown = Callback::from(move |_: MouseEvent| browser_sys::vibrate(40));
+
+    let expression_clone = expression.clone();
+    let oninput = Callback::from(move |input_event: InputEvent| {
+        let event: Event = input_event.dyn_into().unwrap_throw();
+        let event_target = event.target().unwrap_throw();
+        let target: HtmlInputElement = event_target.dyn_into().unwrap_throw();
+        expression_clone.set(target.value());
+    });
+
     let expression = &*expression;
     let result = &*result;
     let onclick_clone = onclick.clone();
+    let onmousedown_clone = onmousedown.clone();
     let mini_btn = move |label: &str| {
         html! {
-            <div onclick={onclick_clone.clone()} class={classes!("flex-1","px-2","py-6","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
+            <div onclick={onclick_clone.clone()} onmousedown={onmousedown_clone.clone()} class={classes!("flex-1","px-2","py-6","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
                 <div class={classes!("rounded-full","h-12","w-12","flex","items-center","bg-cyan-800","justify-center","shadow-lg","border-2","border-cyan-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{label}</div>
             </div>
         }
@@ -126,9 +150,10 @@ pub fn app() -> Html {
         }
     };
     let onclick_clone = onclick.clone();
+    let onmousedown_clone = onmousedown.clone();
     let main_btn = move |label: &str| {
         html! {
-            <div onclick={onclick_clone.clone()} class={classes!("flex-1","px-2","py-2","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
+            <div onclick={onclick_clone.clone()} onmousedown={onmousedown_clone.clone()} class={classes!("flex-1","px-2","py-2","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
                 <div class={classes!("rounded-full","h-20","w-20","flex","items-center","bg-cyan-800","justify-center","shadow-lg","border-2","border-cyan-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{label}</div>
             </div>
         }
@@ -146,7 +171,12 @@ pub fn app() -> Html {
         <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-cyan-900","select-none","shadow-lg","border","border-cyan-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
             <div>
             <div class={classes!("p-5","text-white","text-center","text-3xl","bg-cyan-900")}><span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}</div>
-            <div class={classes!("pt-12","p-5","pb-0","h-20","select-text","text-white","text-right","text-3xl","bg-cyan-800")}>{ expression }</div>
+            <input
+                type={"url"}
+                value={expression.clone()}
+                {oninput}
+                class={classes!("pt-12","p-5","pb-0","h-20","select-text","text-white","text-right","text-3xl","bg-cyan-800")}
+                />
             <div class={classes!("p-4","h-16","select-text","text-white","text-right","text-3xl","bg-cyan-800")}>
             <div class={classes!("ph-2", "bg-cyan-800")}>
             {
@@ -213,9 +243,9 @@ pub fn app() -> Html {
 
         <div class={classes!("flex","items-stretch","bg-cyan-900","h-24","mb-4")}>
             {main_btn("0")}
-            {main_btn(".")}
+            {main_btn_dual(".", "ABC")}
             {main_btn("⌫")}
-            <div onclick={onclick.clone()} class={classes!("flex-1","px-2","py-2","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
+            <div onclick={onclick.clone()} onmousedown={onmousedown.clone()} class={classes!("flex-1","px-2","py-2","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
             {
                 if *invalid_state {
                     html! {
