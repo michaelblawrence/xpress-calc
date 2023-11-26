@@ -13,6 +13,11 @@ enum RecursiveExpression {
     Local(String),
     FuncDeclaration(Vec<String>, Box<RecursiveExpression>),
     If(Box<RecursiveExpression>, Box<RecursiveExpression>),
+    IfElse(
+        Box<RecursiveExpression>,
+        Box<RecursiveExpression>,
+        Box<RecursiveExpression>,
+    ),
     AssignOp(String, Box<RecursiveExpression>),
     BinaryOp(Box<RecursiveExpression>, BinaryOp, Box<RecursiveExpression>),
     Func0(Func0Op),
@@ -121,6 +126,14 @@ impl<'a> Compiler<'a> {
                     let mut routine = vec![];
                     delve(block, &mut routine);
                     stream.push(Instruction::SkipIfNot(routine));
+                }
+                RecursiveExpression::IfElse(condition, if_block, else_block) => {
+                    delve(condition, stream);
+                    let mut if_routine = vec![];
+                    delve(if_block, &mut if_routine);
+                    let mut else_routine = vec![];
+                    delve(else_block, &mut else_routine);
+                    stream.push(Instruction::IfElse(if_routine, else_routine));
                 }
                 RecursiveExpression::AssignOp(ident, value) => {
                     delve(value, stream);
@@ -298,10 +311,20 @@ impl<'a> Compiler<'a> {
         let expression = self.parse_expression()?;
         self.try_consume(&Token::CloseParen)?;
         let block = self.parse_block()?;
-        Some(RecursiveExpression::If(
-            Box::new(expression),
-            Box::new(block),
-        ))
+        match self.try_consume(&Token::Else) {
+            Some(_) => {
+                let else_block = self.parse_block()?;
+                Some(RecursiveExpression::IfElse(
+                    Box::new(expression),
+                    Box::new(block),
+                    Box::new(else_block),
+                ))
+            }
+            None => Some(RecursiveExpression::If(
+                Box::new(expression),
+                Box::new(block),
+            )),
+        }
     }
 
     fn parse_func_0(&mut self) -> Option<RecursiveExpression> {

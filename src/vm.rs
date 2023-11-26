@@ -14,6 +14,7 @@ pub enum Instruction {
     CallRoutine,
     PushRoutine(Vec<Instruction>),
     SkipIfNot(Vec<Instruction>),
+    IfElse(Vec<Instruction>, Vec<Instruction>),
     PushRandom,
     Mul,
     Mod,
@@ -82,6 +83,17 @@ impl VM {
                 Instruction::CallRoutine => self.call_routine()?,
                 Instruction::PushRoutine(routine) => self.push(routine.to_vec()),
                 Instruction::SkipIfNot(block) => self.conditional(|x| x != 0.0, block)?,
+                Instruction::IfElse(if_block, else_block) => {
+                    let operand = self.stack.pop();
+                    let operand = operand
+                        .ok_or_else(|| String::from("missing operand"))?
+                        .as_number();
+                    if operand != 0.0 {
+                        self.run(if_block)?;
+                    } else {
+                        self.run(else_block)?;
+                    }
+                },
                 Instruction::PushRandom => self.push(self.rng.rand()),
                 Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs)?,
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs)?,

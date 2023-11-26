@@ -248,8 +248,46 @@ mod tests {
     #[test]
     fn can_compute_if_statements() {
         let mut vm = VM::new();
-        assert_eq!(0.0, compute(&mut vm, "{let x = 0; if (3 < 2) { let x = 3 }; x}").unwrap().round());
-        assert_eq!(3.0, compute(&mut vm, "{let x = 0; if (3 > 2) { let x = 3 }; x}").unwrap().round());
+        assert_eq!(
+            0.0,
+            compute(&mut vm, "{let x = 0; if (3 < 2) { let x = 3 }; x}")
+                .unwrap()
+                .round()
+        );
+        assert_eq!(
+            3.0,
+            compute(&mut vm, "{let x = 0; if (3 > 2) { let x = 3 }; x}")
+                .unwrap()
+                .round()
+        );
+    }
+
+    #[test]
+    fn can_compute_if_else_expressions() {
+        let mut vm = VM::new();
+        assert_eq!(
+            5.0,
+            compute(&mut vm, "if (1) { 5 } else { 8 }").unwrap().round()
+        );
+        assert_eq!(
+            8.0,
+            compute(&mut vm, "if (0) { 5 } else { 8 }").unwrap().round()
+        );
+    }
+
+    #[test]
+    fn can_compute_loop_program() {
+        let mut vm = VM::new();
+        assert_eq!(
+            None,
+            compute(
+                &mut vm,
+                "let loop = (i, n, f) => { if (i < n) { f(); loop(i + 1, n, f); } else {} }"
+            )
+        );
+        assert_eq!(None, compute(&mut vm, "let y = 0"));
+        assert_eq!(None, compute(&mut vm, "loop(0, 9, () => let y = y + 1)"));
+        assert_eq!(9.0, compute(&mut vm, "y").unwrap().round());
     }
 
     #[test]

@@ -22,6 +22,7 @@ pub enum Token {
     Identifier(String),
     Let,
     If,
+    Else,
     LeftArrow,
     LessThan,
     LessThanEquals,
@@ -83,6 +84,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::Let
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("if")) {
         Token::If
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("else")) {
+        Token::Else
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("pi").or(parser::Chomp::char('𝜋')))
     {
         Token::Pi
