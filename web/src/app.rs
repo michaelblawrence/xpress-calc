@@ -5,11 +5,9 @@ use yew::prelude::*;
 
 use xpress_calc::vm::VM;
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
+use crate::app::browser_sys::log;
+
+mod browser_sys;
 
 #[function_component(App)]
 pub fn app() -> Html {
@@ -29,13 +27,6 @@ pub fn app() -> Html {
             move |x: f64| {
                 log(&format!("<computed>: {x}"));
                 result.set(Some(x));
-                invalid_state.set(false);
-            }
-        };
-        let lazy_state = {
-            let invalid_state = invalid_state.clone();
-            move |msg: &str| {
-                log(msg);
                 invalid_state.set(false);
             }
         };
