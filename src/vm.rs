@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
@@ -20,32 +20,6 @@ pub enum Instruction {
     Pow,
     Enter,
     Leave,
-}
-
-impl Instruction {
-    pub fn has_side_effects(&self) -> bool {
-        match self {
-            Self::CallRoutine
-            | Self::Assign(_)
-            | Self::ShadowAssign(_)
-            | Self::Enter
-            | Self::Leave => true,
-
-            Self::Add
-            | Self::Sub
-            | Self::Sine
-            | Self::Cosine
-            | Self::Log
-            | Self::Push(_)
-            | Self::LoadLocal(_)
-            | Self::PushRoutine(_)
-            | Self::PushRandom
-            | Self::Mul
-            | Self::Mod
-            | Self::Div
-            | Self::Pow => false,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
