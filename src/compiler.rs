@@ -64,17 +64,33 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(&mut self) -> Result<Vec<Instruction>, String> {
-        let program_expression = self
-            .parse_expression()
-            .ok_or_else(|| format!("empty program expression!"))?;
+    fn reset(&mut self) -> usize {
+        let last_pos = self.position;
+        self.position = 0;
+        last_pos
+    }
 
-        if self.position != self.program.len() {
-            return Err(format!(
-                "failed to compile remaining tokens: {:?}",
-                &self.program[self.position..]
-            ));
+    pub fn compile(&mut self) -> Result<Vec<Instruction>, String> {
+        let program_expression = self.parse_expression();
+        let last_pos = self.reset();
+
+        if last_pos != self.program.len() {
+            let err_msg = if program_expression.is_some() {
+                format!(
+                    "failed to compile remaining tokens: {:?}",
+                    &self.program[last_pos..]
+                )
+            } else {
+                format!(
+                    "failed to parse expression, unexpected token sequence: {:?}",
+                    &self.program[last_pos..]
+                )
+            };
+            return Err(err_msg);
         }
+
+        let program_expression =
+            program_expression.ok_or_else(|| format!("invalid program expression."))?;
 
         let mut instruction_stream = vec![];
         delve(&program_expression, &mut instruction_stream);
