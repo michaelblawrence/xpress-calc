@@ -227,7 +227,7 @@ mod tests {
         assert_eq!(0.0, compute(&mut vm, "3 < 2").unwrap().round());
         assert_eq!(0.0, compute(&mut vm, "2 < 2").unwrap().round());
         assert_eq!(1.0, compute(&mut vm, "1 < 2").unwrap().round());
-        
+
         assert_eq!(0.0, compute(&mut vm, "3 <= 2").unwrap().round());
         assert_eq!(1.0, compute(&mut vm, "2 <= 2").unwrap().round());
         assert_eq!(1.0, compute(&mut vm, "1 <= 2").unwrap().round());
@@ -239,7 +239,7 @@ mod tests {
         assert_eq!(1.0, compute(&mut vm, "3 > 2").unwrap().round());
         assert_eq!(0.0, compute(&mut vm, "2 > 2").unwrap().round());
         assert_eq!(0.0, compute(&mut vm, "1 > 2").unwrap().round());
-        
+
         assert_eq!(1.0, compute(&mut vm, "3 >= 2").unwrap().round());
         assert_eq!(1.0, compute(&mut vm, "2 >= 2").unwrap().round());
         assert_eq!(0.0, compute(&mut vm, "1 >= 2").unwrap().round());
@@ -336,6 +336,13 @@ mod tests {
         compute(&mut vm, "let calc2 = ( x ) => { let y = y * x }");
         assert_eq!(None, compute(&mut vm, "calc2(3)"));
         assert_eq!(45.0, compute(&mut vm, "y").unwrap().round());
+
+        compute(&mut vm, "let calc = (x, y) => { x^2 + y^2 }");
+        assert_eq!(13.0, compute(&mut vm, "calc(2, 3)").unwrap().round());
+
+        compute(&mut vm, "let calc = () => {}");
+        compute(&mut vm, "calc()");
+        assert!(vm.pop_result().is_none());
     }
 
     #[test]

@@ -248,6 +248,9 @@ impl<'a> Compiler<'a> {
 
     fn parse_block(&mut self) -> Option<RecursiveExpression> {
         self.try_consume(&Token::OpenCurly)?;
+        if let Some(_) = self.try_consume(&Token::CloseCurly) {
+            return Some(RecursiveExpression::Block(vec![]));
+        }
         let expression = self.parse_expression()?;
         let mut statements = vec![expression];
         if let Some(_) = self.try_consume(&Token::Semicolon) {
