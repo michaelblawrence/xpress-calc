@@ -1,3 +1,5 @@
+ignore = ["public/tailwind.css"]
+
 [[hooks]]
 stage = "pre_build"
 command = "tailwindcss"
