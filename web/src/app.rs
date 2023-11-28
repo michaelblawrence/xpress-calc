@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
-use xpress_calc::vm::VM;
+use xpress_calc::vm::{Instruction, VM};
 
 use crate::app::browser_sys::log;
 
@@ -105,8 +105,8 @@ pub fn app() -> Html {
                 expression.set(String::new());
             } else if text.as_str() == "CALC" {
                 if !*invalid_state {
-                    let result = xpress_calc::compute(&mut vm.borrow_mut(), &*expression);
-                    let next_expression = result.map_or_else(|| String::new(), |x| x.to_string());
+                    let next_expression =
+                        apply_current_expression(&mut vm.borrow_mut(), &expression);
                     expression.set(next_expression);
                 }
             } else if matches!(c, '√') {
@@ -126,7 +126,23 @@ pub fn app() -> Html {
         let event: Event = input_event.dyn_into().unwrap_throw();
         let event_target = event.target().unwrap_throw();
         let target: HtmlInputElement = event_target.dyn_into().unwrap_throw();
-        expression_clone.set(target.value());
+        let value = target.value();
+        expression_clone.set(value);
+    });
+
+    let expression_clone = expression.clone();
+    let invalid_state_clone = invalid_state.clone();
+    let onkeypress = Callback::from(move |kb_event: KeyboardEvent| {
+        const ENTER_KEY: u32 = 13;
+
+        match kb_event.char_code() {
+            ENTER_KEY if !*invalid_state_clone => {
+                let next_expression =
+                    apply_current_expression(&mut vm.borrow_mut(), &expression_clone);
+                expression_clone.set(next_expression);
+            }
+            _ => {}
+        }
     });
 
     let expression = &*expression;
@@ -264,4 +280,20 @@ pub fn app() -> Html {
         </div>
         </div>
     }
+}
+
+fn apply_current_expression(vm: &mut VM, expression: &str) -> String {
+    let mut ident = None;
+
+    let result = xpress_calc::compile(&*expression)
+        .and_then(|program| {
+            if let Some(Instruction::Assign(set)) = program.last() {
+                ident = Some(set.clone());
+            }
+            vm.run(&program)
+        })
+        .and_then(|_| vm.pop_result().ok_or_else(|| String::from("no result")))
+        .map_err(|err| log(&format!("ERROR: {err}")));
+
+    result.map_or_else(|_| ident.unwrap_or(String::new()), |x| x.to_string())
 }
