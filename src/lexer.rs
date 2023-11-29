@@ -34,6 +34,8 @@ pub enum Token {
     Sqrt,
     Comma,
     Semicolon,
+    Eq,
+    NotEq,
 }
 
 pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Token, String>> + 'a {
@@ -117,6 +119,10 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         Token::Comma
     } else if let Some(_) = bite.nibble(parser::Chomp::char(';')) {
         Token::Semicolon
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("==")) {
+        Token::Eq
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("!=")) {
+        Token::NotEq
     } else if let Some(_) = bite.nibble(parser::Chomp::char('=')) {
         Token::Equals
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("<=").or(parser::Chomp::char('≤')))

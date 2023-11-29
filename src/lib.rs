@@ -286,6 +286,18 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_eq_ne() {
+        let mut vm = VM::new();
+        assert_eq!(0.0, compute(&mut vm, "3 == 2").unwrap().round());
+        assert_eq!(1.0, compute(&mut vm, "2 == 2").unwrap().round());
+        assert_eq!(0.0, compute(&mut vm, "1 == 2").unwrap().round());
+
+        assert_eq!(1.0, compute(&mut vm, "3 != 2").unwrap().round());
+        assert_eq!(0.0, compute(&mut vm, "2 != 2").unwrap().round());
+        assert_eq!(1.0, compute(&mut vm, "1 != 2").unwrap().round());
+    }
+
+    #[test]
     fn can_compute_if_statements() {
         let mut vm = VM::new();
         assert_eq!(

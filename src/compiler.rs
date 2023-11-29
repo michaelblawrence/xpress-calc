@@ -32,6 +32,8 @@ pub(crate) enum BinaryOp {
     Mul,
     Mod,
     Pow,
+    EQ,
+    NEQ,
     LT,
     LTE,
     GT,
@@ -44,7 +46,7 @@ impl BinaryOp {
             Self::Pow | Self::Mod => 3,
             Self::Mul | Self::Div => 2,
             Self::Add | Self::Sub => 1,
-            Self::LT | Self::LTE | Self::GT | Self::GTE => 0,
+            Self::EQ | Self::NEQ | Self::LT | Self::LTE | Self::GT | Self::GTE => 0,
         }
     }
 }
@@ -125,6 +127,8 @@ impl<'a> Compiler<'a> {
                         BinaryOp::Mul => stream.push(Instruction::Mul),
                         BinaryOp::Mod => stream.push(Instruction::Mod),
                         BinaryOp::Pow => stream.push(Instruction::Pow),
+                        BinaryOp::EQ => stream.push(Instruction::CmpEQ),
+                        BinaryOp::NEQ => stream.push(Instruction::CmpNEQ),
                         BinaryOp::LT => stream.push(Instruction::CmpLT),
                         BinaryOp::LTE => stream.push(Instruction::CmpLTE),
                         BinaryOp::GT => stream.push(Instruction::CmpGT),
@@ -419,6 +423,8 @@ impl<'a> Compiler<'a> {
             Token::Div => Some(BinaryOp::Div),
             Token::Mod => Some(BinaryOp::Mod),
             Token::Pow => Some(BinaryOp::Pow),
+            Token::Eq => Some(BinaryOp::EQ),
+            Token::NotEq => Some(BinaryOp::NEQ),
             Token::LessThan => Some(BinaryOp::LT),
             Token::LessThanEquals => Some(BinaryOp::LTE),
             Token::GreaterThan => Some(BinaryOp::GT),

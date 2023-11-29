@@ -61,6 +61,8 @@ pub(crate) fn pretty_print(program_expression: RecursiveExpression) -> String {
                     BinaryOp::Mul => output.push_str(" * "),
                     BinaryOp::Mod => output.push_str(" % "),
                     BinaryOp::Pow => output.push_str(" ^"),
+                    BinaryOp::EQ => output.push_str(" == "),
+                    BinaryOp::NEQ => output.push_str(" != "),
                     BinaryOp::LT => output.push_str(" < "),
                     BinaryOp::LTE => output.push_str(" <= "),
                     BinaryOp::GT => output.push_str(" > "),

@@ -20,6 +20,8 @@ pub enum Instruction {
     Mod,
     Div,
     Pow,
+    CmpEQ,
+    CmpNEQ,
     CmpLT,
     CmpLTE,
     CmpGT,
@@ -93,12 +95,14 @@ impl VM {
                     } else {
                         self.run(else_block)?;
                     }
-                },
+                }
                 Instruction::PushRandom => self.push(self.rng.rand()),
                 Instruction::Mul => self.binary_op(|lhs, rhs| lhs * rhs)?,
                 Instruction::Div => self.binary_op(|lhs, rhs| lhs / rhs)?,
                 Instruction::Mod => self.binary_op(|lhs, rhs| lhs % rhs)?,
                 Instruction::Pow => self.binary_op(|lhs, rhs| lhs.powf(rhs))?,
+                Instruction::CmpEQ => self.binary_op(|lhs, rhs| (lhs == rhs) as u8 as f64)?,
+                Instruction::CmpNEQ => self.binary_op(|lhs, rhs| (lhs != rhs) as u8 as f64)?,
                 Instruction::CmpLT => self.binary_op(|lhs, rhs| (lhs < rhs) as u8 as f64)?,
                 Instruction::CmpLTE => self.binary_op(|lhs, rhs| (lhs <= rhs) as u8 as f64)?,
                 Instruction::CmpGT => self.binary_op(|lhs, rhs| (lhs > rhs) as u8 as f64)?,
