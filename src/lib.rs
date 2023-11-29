@@ -52,6 +52,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn can_parse_negatives_and_decimals() {
+        let mut tokens = lexer::tokenize("-90".into());
+        assert_eq!(Some(Ok(Token::LiteralNum(-90.0))), tokens.next());
+        assert_eq!(None, tokens.next());
+
+        let mut tokens = lexer::tokenize("0.3".into());
+        assert_eq!(Some(Ok(Token::LiteralNum(0.3))), tokens.next());
+        assert_eq!(None, tokens.next());
+
+        let mut tokens = lexer::tokenize("0.3 - 0.2".into());
+        assert_eq!(Some(Ok(Token::LiteralNum(0.3))), tokens.next());
+        assert_eq!(Some(Ok(Token::Sub)), tokens.next());
+        assert_eq!(Some(Ok(Token::LiteralNum(0.2))), tokens.next());
+        assert_eq!(None, tokens.next());
+
+        let mut tokens = lexer::tokenize("0.3 + -0.2".into());
+        assert_eq!(Some(Ok(Token::LiteralNum(0.3))), tokens.next());
+        assert_eq!(Some(Ok(Token::Plus)), tokens.next());
+        assert_eq!(Some(Ok(Token::LiteralNum(-0.2))), tokens.next());
+        assert_eq!(None, tokens.next());
+    }
+
+    #[test]
     fn can_parse_sin() {
         let mut tokens = lexer::tokenize("sin(90)".into());
 
