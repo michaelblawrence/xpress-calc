@@ -68,3 +68,13 @@ mod sys {
         Ok(())
     }
 }
+
+mod macros {
+    #[macro_export]
+    macro_rules! console_log {
+        ($($arg:tt)*) => {{
+            let res = format!($($arg)*);
+            crate::app::log(&res);
+        }}
+    }
+}
