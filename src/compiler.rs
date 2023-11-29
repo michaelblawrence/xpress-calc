@@ -7,7 +7,7 @@ pub struct Compiler<'a> {
 }
 
 #[derive(Debug)]
-enum RecursiveExpression {
+pub(crate) enum RecursiveExpression {
     Block(Vec<RecursiveExpression>),
     Literal(f64),
     Local(String),
@@ -25,7 +25,7 @@ enum RecursiveExpression {
     FuncLocal(String, Vec<RecursiveExpression>),
 }
 #[derive(Debug, Clone, Copy)]
-enum BinaryOp {
+pub(crate) enum BinaryOp {
     Add,
     Sub,
     Div,
@@ -50,11 +50,11 @@ impl BinaryOp {
 }
 
 #[derive(Debug)]
-enum Func0Op {
+pub(crate) enum Func0Op {
     Rand,
 }
 #[derive(Debug)]
-enum Func1Op {
+pub(crate) enum Func1Op {
     Sin,
     Cos,
     Sqrt,
@@ -76,30 +76,6 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn compile(&mut self) -> Result<Vec<Instruction>, String> {
-        let program_expression = self.parse_expression();
-        let last_pos = self.reset();
-
-        if last_pos != self.program.len() {
-            let err_msg = if program_expression.is_some() {
-                format!(
-                    "failed to compile remaining tokens: {:?}",
-                    &self.program[last_pos..]
-                )
-            } else {
-                format!(
-                    "failed to parse expression, unexpected token sequence: {:?}",
-                    &self.program[last_pos..]
-                )
-            };
-            return Err(err_msg);
-        }
-
-        let program_expression =
-            program_expression.ok_or_else(|| format!("invalid program expression."))?;
-
-        let mut instruction_stream = vec![];
-        delve(&program_expression, &mut instruction_stream);
-
         fn delve(node: &RecursiveExpression, stream: &mut Vec<Instruction>) {
             match node {
                 RecursiveExpression::Block(statements) => {
@@ -178,7 +154,34 @@ impl<'a> Compiler<'a> {
             }
         }
 
+        let mut instruction_stream = vec![];
+
+        let program_expression = self.compile_expression_tree()?;
+        delve(&program_expression, &mut instruction_stream);
+
         Ok(instruction_stream)
+    }
+
+    pub(crate) fn compile_expression_tree(&mut self) -> Result<RecursiveExpression, String> {
+        let program_expression = self.parse_expression();
+        let last_pos = self.reset();
+        if last_pos != self.program.len() {
+            let err_msg = if program_expression.is_some() {
+                format!(
+                    "failed to compile remaining tokens: {:?}",
+                    &self.program[last_pos..]
+                )
+            } else {
+                format!(
+                    "failed to parse expression, unexpected token sequence: {:?}",
+                    &self.program[last_pos..]
+                )
+            };
+            return Err(err_msg);
+        }
+        let program_expression =
+            program_expression.ok_or_else(|| format!("invalid program expression."))?;
+        Ok(program_expression)
     }
 
     fn parse_expression(&mut self) -> Option<RecursiveExpression> {
