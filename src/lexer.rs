@@ -39,6 +39,7 @@ pub enum Token {
 pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Token, String>> + 'a {
     let mut bite = source;
     let mut done = false;
+    let mut last_token = None;
 
     let mut closure_stack = vec![];
     let mut closure_stack_iter = None;
@@ -54,7 +55,10 @@ pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Tok
                 .next_back();
         }
 
-        let next_token = tokenize_impl(&mut bite);
+        let next_token = tokenize_impl(&mut bite, last_token.as_ref());
+        if let Ok(next_token) = &next_token {
+            last_token = Some(next_token.clone());
+        }
         match &next_token {
             Ok(Token::OpenParen) => closure_stack.push(Token::CloseParen),
             Ok(Token::OpenCurly) => closure_stack.push(Token::CloseCurly),
@@ -71,7 +75,7 @@ pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Tok
     })
 }
 
-fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
+fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Result<Token, String> {
     let token = if let Some(_) = bite.nibble(parser::Chomp::literal("sin")) {
         Token::Sine
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("log")) {
@@ -93,7 +97,10 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>) -> Result<Token, String> {
         Token::E
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("sqrt")) {
         Token::Sqrt
-    } else if let Some(literal) = bite.nibble(parser::Chomp::any_number()) {
+    } else if bite.can_nibble(parser::Chomp::any_number())
+        && !matches!(last_token, Some(Token::LiteralNum(_)))
+    {
+        let literal = bite.nibble(parser::Chomp::any_number()).unwrap();
         Token::LiteralNum(parse(literal)?)
     } else if let Some(_) = bite.nibble(parser::Chomp::char('(')) {
         Token::OpenParen

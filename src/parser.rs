@@ -23,6 +23,9 @@ impl<'a> Bite<'a> {
     pub fn as_str(&self) -> &str {
         self.inner
     }
+    pub fn can_nibble<M: ChompMatcher<'a>>(&self, chomp: Chomp<M>) -> bool {
+        chomp.is_match(*self)
+    }
     pub fn nibble<M: ChompMatcher<'a>>(&mut self, chomp: Chomp<M>) -> Option<&'a str> {
         let (matched, bite) = chomp.consume(*self);
         *self = bite;
@@ -121,6 +124,10 @@ impl<'a, M: FnOnce(&'a str) -> Option<usize>> Chomp<M> {}
 impl<'a, M: ChompMatcher<'a>> Chomp<M> {
     pub fn new(matcher: M) -> Self {
         Self { matcher }
+    }
+    pub fn is_match(mut self, bite: Bite<'a>) -> bool {
+        let consume = self.matcher.consume(bite);
+        consume.map_or(false, |(matched, _)| !matched.is_empty())
     }
     pub fn consume(mut self, bite: Bite<'a>) -> (Option<&'a str>, Bite<'a>) {
         let consume = self.matcher.consume(bite);
