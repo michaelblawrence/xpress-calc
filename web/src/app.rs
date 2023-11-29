@@ -153,16 +153,17 @@ pub fn app() -> Html {
     let result = &*result;
     let onclick_clone = onclick.clone();
     let onmousedown_clone = onmousedown.clone();
-    let mini_btn = move |label: &str| {
+    let mini_btn = move |ButtonProp { label, theme }| {
+        let theme = theme.unwrap_or("bg-cyan-800");
         html! {
             <div onclick={onclick_clone.clone()} onmousedown={onmousedown_clone.clone()} class={classes!("flex-1","px-2","py-6","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
-                <div class={classes!("rounded-full","h-12","w-12","flex","items-center","bg-cyan-800","justify-center","shadow-lg","border-2","border-cyan-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{label}</div>
+                <div class={classes!("rounded-full","h-12","w-12","flex","items-center",theme,"justify-center","shadow-lg","border-2","border-cyan-700","hover:border-2","hover:border-cyan-500","focus:outline-none")}>{label}</div>
             </div>
         }
     };
     let mini_btn_ref = &mini_btn;
     let shift_mode_clone = shift_mode.clone();
-    let mini_btn_dual = move |normal_label: &str, shift_label: &str| {
+    let mini_btn_dual = move |normal_label: ButtonProp, shift_label: ButtonProp| {
         if *shift_mode_clone {
             mini_btn_ref(shift_label)
         } else {
@@ -187,6 +188,8 @@ pub fn app() -> Html {
             main_btn_ref(normal_label)
         }
     };
+    let shift_mode = *shift_mode;
+
     html! {
         <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-cyan-900","select-none","shadow-lg","border","border-cyan-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
             <div>
@@ -217,26 +220,26 @@ pub fn app() -> Html {
 
         <div class={classes!("flex","items-stretch","bg-cyan-900","h-16","mt-4")}>
             {mini_btn_dual("⇒".into(), "📋".into())}
-            {mini_btn_dual("𝒂", "f")}
-            {mini_btn_dual("𝒃", "g")}
-            {mini_btn_dual("%", "√")}
-            {mini_btn_dual(";", "𝜋")}
-            {mini_btn("⇪")}
+            {mini_btn_dual("𝒂".into(), "f".into())}
+            {mini_btn_dual("𝒃".into(), "g".into())}
+            {mini_btn_dual("if".into(), "else".into())}
+            {mini_btn_dual(";".into(), "𝜋".into())}
+            {mini_btn(ButtonProp {label: "⇪", theme: shift_mode.then_some("bg-yellow-900")})}
         </div>
 
         <div class={classes!("flex","items-stretch","bg-cyan-900","h-16")}>
-            {mini_btn("let")}
-            {mini_btn_dual("𝒙", "i")}
-            {mini_btn_dual("𝒚", "j")}
-            {mini_btn_dual("<", "{")}
-            {mini_btn_dual(">", "}")}
-            {mini_btn("=")}
+            {mini_btn("let".into())}
+            {mini_btn_dual("𝒙".into(), "i".into())}
+            {mini_btn_dual("𝒚".into(), "j".into())}
+            {mini_btn_dual("<".into(), "{".into())}
+            {mini_btn_dual(">".into(), "}".into())}
+            {mini_btn("=".into())}
         </div>
 
         <div class={classes!("flex","items-stretch","bg-cyan-900","h-24","mt-2")}>
             {main_btn("AC")}
-            {main_btn_dual("(", "{")}
-            {main_btn_dual(")", "}")}
+            {main_btn("(")}
+            {main_btn(")")}
             {main_btn("÷")}
         </div>
 
@@ -301,4 +304,24 @@ fn apply_current_expression(vm: &mut VM, expression: &str) -> String {
         .map_err(|err| log(&format!("ERROR: {err}")));
 
     result.map_or_else(|_| ident.unwrap_or(String::new()), |x| x.to_string())
+}
+
+struct ButtonProp {
+    label: &'static str,
+    theme: Option<&'static str>,
+}
+
+impl From<&'static str> for ButtonProp {
+    fn from(label: &'static str) -> Self {
+        Self { label, theme: None }
+    }
+}
+
+impl From<(&'static str, &'static str)> for ButtonProp {
+    fn from((label, theme): (&'static str, &'static str)) -> Self {
+        Self {
+            label,
+            theme: Some(theme),
+        }
+    }
 }
