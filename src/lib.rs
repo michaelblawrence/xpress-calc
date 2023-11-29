@@ -4,6 +4,7 @@ use vm::VM;
 pub mod compiler;
 pub mod lexer;
 pub mod parser;
+pub mod pretty;
 pub mod vm;
 
 pub fn compute(vm: &mut VM, input: &str) -> Option<f64> {
@@ -27,14 +28,7 @@ pub fn compute(vm: &mut VM, input: &str) -> Option<f64> {
 }
 
 pub fn compile(input: &str) -> Result<Vec<vm::Instruction>, String> {
-    let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
-    let tokens = lexer::tokenize(source).collect();
-    let tokens: Vec<_> = match tokens {
-        Ok(x) => x,
-        Err(err) => {
-            return Err(format!("ERROR: could not interpret input tokens: {err}"));
-        }
-    };
+    let tokens = tokenize(input)?;
     let mut compiler = Compiler::new(&tokens);
     let program = match compiler.compile() {
         Ok(x) => x,
@@ -43,6 +37,23 @@ pub fn compile(input: &str) -> Result<Vec<vm::Instruction>, String> {
         }
     };
     Ok(program)
+}
+
+pub fn format(input: &str) -> Result<String, String> {
+    let tokens = tokenize(input)?;
+    let mut compiler = Compiler::new(&tokens);
+    let expression_tree = compiler.compile_expression_tree()?;
+    let formatted = pretty::pretty_print(expression_tree);
+    Ok(formatted)
+}
+
+fn tokenize(input: &str) -> Result<Vec<lexer::Token>, String> {
+    let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
+    let tokens = lexer::tokenize(source).collect();
+    match tokens {
+        Ok(x) => Ok(x),
+        Err(err) => Err(format!("ERROR: could not interpret input tokens: {err}")),
+    }
 }
 
 #[cfg(test)]
@@ -404,6 +415,12 @@ mod tests {
         compute(&mut vm, "let calc = () => {}");
         compute(&mut vm, "calc()");
         assert!(vm.pop_result().is_none());
+    }
+
+    #[test]
+    fn can_pretty_print() {
+        let formatted = super::format("let calc= ( x, ) =>sin (90)").unwrap();
+        assert_eq!("let calc = (x) => sin(90)", formatted);
     }
 
     #[test]
