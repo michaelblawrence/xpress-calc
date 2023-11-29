@@ -78,7 +78,7 @@ mod tests {
         assert_eq!(Some(Ok(Token::LiteralNum(0.2))), tokens.next());
         assert_eq!(None, tokens.next());
 
-        let mut tokens = lexer::tokenize("0.3 -0.2".into());
+        let mut tokens = lexer::tokenize("0.3 -.2".into());
         assert_eq!(Some(Ok(Token::LiteralNum(0.3))), tokens.next());
         assert_eq!(Some(Ok(Token::Sub)), tokens.next());
         assert_eq!(Some(Ok(Token::LiteralNum(0.2))), tokens.next());
