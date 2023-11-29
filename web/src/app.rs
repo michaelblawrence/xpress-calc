@@ -211,8 +211,8 @@ pub fn app() -> Html {
             </div>
 
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-16")}>
-            {mini_btn_dual("⇒", "📋")}
+        <div class={classes!("flex","items-stretch","bg-cyan-900","h-16","mt-4")}>
+            {mini_btn_dual("⇒".into(), "📋".into())}
             {mini_btn_dual("𝒂", "f")}
             {mini_btn_dual("𝒃", "g")}
             {mini_btn_dual("%", "√")}
@@ -229,7 +229,7 @@ pub fn app() -> Html {
             {mini_btn("=")}
         </div>
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-24")}>
+        <div class={classes!("flex","items-stretch","bg-cyan-900","h-24","mt-2")}>
             {main_btn("AC")}
             {main_btn_dual("(", "{")}
             {main_btn_dual(")", "}")}
