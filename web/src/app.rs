@@ -111,7 +111,11 @@ pub fn app() -> Html {
                 }
             } else if matches!(c, '√') {
                 expression.set(format!("{} sqrt(", &*expression));
-            } else if c.is_ascii_digit() || matches!(text.as_str(), "c" | "(" | ")") {
+            } else if matches!(c, '0'..='9' | '.')
+                && (expression.ends_with("- ") || expression.ends_with("+ "))
+            {
+                expression.set(format!("{}{}", &*expression.trim_end(), text));
+            } else if c.is_ascii_digit() || matches!(text.as_str(), "c" | "(" | ")" | ".") {
                 expression.set(format!("{}{}", &*expression, text));
             } else {
                 expression.set(format!("{} {} ", &*expression, text));
