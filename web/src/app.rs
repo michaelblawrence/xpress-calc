@@ -154,10 +154,10 @@ pub fn app() -> Html {
     let onclick_clone = onclick.clone();
     let onmousedown_clone = onmousedown.clone();
     let mini_btn = move |ButtonProp { label, theme }| {
-        let theme = theme.unwrap_or("bg-cyan-800");
+        let theme = theme.unwrap_or("bg-gray-800");
         html! {
             <div onclick={onclick_clone.clone()} onmousedown={onmousedown_clone.clone()} class={classes!("flex-1","px-2","py-6","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
-                <div class={classes!("rounded-full","h-12","w-12","flex","items-center",theme,"justify-center","shadow-lg","border-2","border-cyan-700","hover:border-2","hover:border-cyan-500","focus:outline-none")}>{label}</div>
+                <div class={classes!("rounded-full","h-12","w-12","flex","items-center",theme,"justify-center","shadow-lg","border-2","border-gray-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{label}</div>
             </div>
         }
     };
@@ -175,7 +175,7 @@ pub fn app() -> Html {
     let main_btn = move |label: &str| {
         html! {
             <div onclick={onclick_clone.clone()} onmousedown={onmousedown_clone.clone()} class={classes!("flex-1","px-2","py-2","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
-                <div class={classes!("rounded-full","h-20","w-20","flex","items-center","bg-cyan-800","justify-center","shadow-lg","border-2","border-cyan-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{label}</div>
+                <div class={classes!("rounded-full","h-20","w-20","flex","items-center","bg-gray-800","justify-center","shadow-lg","border-2","border-gray-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{label}</div>
             </div>
         }
     };
@@ -191,18 +191,18 @@ pub fn app() -> Html {
     let shift_mode = *shift_mode;
 
     html! {
-        <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-cyan-900","select-none","shadow-lg","border","border-cyan-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
+        <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-gray-900","select-none","shadow-lg","border","border-gray-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
             <div>
-            <div class={classes!("p-5","text-white","text-center","text-3xl","bg-cyan-900")}><span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}</div>
+            <div class={classes!("p-5","text-white","text-center","text-3xl","bg-gray-900")}><span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}</div>
             <input
                 type={"url"}
                 value={expression.clone()}
                 {oninput}
                 {onkeypress}
-                class={classes!("w-full","border-none","pt-12","p-5","pb-0","h-20","select-text","text-white","text-right","text-3xl","bg-cyan-800")}
+                class={classes!("w-full","border-none","pt-12","p-5","pb-0","h-20","select-text","text-white","text-right","text-3xl","bg-gray-800")}
                 />
-            <div class={classes!("p-4","h-16","select-text","text-white","text-right","text-3xl","bg-cyan-800")}>
-            <div class={classes!("ph-2", "bg-cyan-800")}>
+            <div class={classes!("p-4","h-16","select-text","text-white","text-right","text-3xl","bg-gray-800")}>
+            <div class={classes!("ph-2", "bg-gray-800")}>
             {
                 if *invalid_state {
                     html!{
@@ -218,7 +218,7 @@ pub fn app() -> Html {
             </div>
 
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-16","mt-4")}>
+        <div class={classes!("flex","items-stretch","bg-gray-900","h-16","mt-4")}>
             {mini_btn_dual("⇒".into(), "📋".into())}
             {mini_btn_dual("𝒂".into(), "f".into())}
             {mini_btn_dual("𝒃".into(), "g".into())}
@@ -227,7 +227,7 @@ pub fn app() -> Html {
             {mini_btn(ButtonProp {label: "⇪", theme: shift_mode.then_some("bg-yellow-900")})}
         </div>
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-16")}>
+        <div class={classes!("flex","items-stretch","bg-gray-900","h-16")}>
             {mini_btn("let".into())}
             {mini_btn_dual("𝒙".into(), "i".into())}
             {mini_btn_dual("𝒚".into(), "j".into())}
@@ -236,28 +236,28 @@ pub fn app() -> Html {
             {mini_btn("=".into())}
         </div>
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-24","mt-2")}>
+        <div class={classes!("flex","items-stretch","bg-gray-900","h-24","mt-2")}>
             {main_btn("AC")}
             {main_btn("(")}
             {main_btn(")")}
             {main_btn("÷")}
         </div>
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-24")}>
+        <div class={classes!("flex","items-stretch","bg-gray-900","h-24")}>
             {main_btn("7")}
             {main_btn("8")}
             {main_btn("9")}
             {main_btn("×")}
         </div>
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-24")}>
+        <div class={classes!("flex","items-stretch","bg-gray-900","h-24")}>
             {main_btn("4")}
             {main_btn("5")}
             {main_btn("6")}
             {main_btn("-")}
         </div>
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-24")}>
+        <div class={classes!("flex","items-stretch","bg-gray-900","h-24")}>
             {main_btn("1")}
             {main_btn("2")}
             {main_btn("3")}
@@ -265,7 +265,7 @@ pub fn app() -> Html {
         </div>
 
 
-        <div class={classes!("flex","items-stretch","bg-cyan-900","h-24","mb-4")}>
+        <div class={classes!("flex","items-stretch","bg-gray-900","h-24","mb-4")}>
             {main_btn("0")}
             {main_btn_dual(".", "ABC")}
             {main_btn("⌫")}
@@ -273,11 +273,11 @@ pub fn app() -> Html {
             {
                 if *invalid_state {
                     html! {
-                        <div class={classes!("rounded-full","h-20","w-20","flex","items-center","bg-cyan-900","justify-center","shadow-lg","border-2","border-cyan-800","text-cyan-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{"CALC"}</div>
+                        <div class={classes!("rounded-full","h-20","w-20","flex","items-center","bg-gray-900","justify-center","shadow-lg","border-2","border-gray-800","text-gray-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{"CALC"}</div>
                     }
                 } else {
                     html! {
-                        <div class={classes!("rounded-full","h-20","w-20","flex","items-center","bg-blue-500","justify-center","shadow-lg","border-2","border-cyan-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{"CALC"}</div>
+                        <div class={classes!("rounded-full","h-20","w-20","flex","items-center","bg-blue-500","justify-center","shadow-lg","border-2","border-gray-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{"CALC"}</div>
                     }
                 }
             }
