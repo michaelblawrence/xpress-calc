@@ -427,6 +427,9 @@ mod tests {
     fn can_pretty_print() {
         let formatted = super::format("let calc= ( x, ) =>sin (90)").unwrap();
         assert_eq!("let calc = (x) => sin(90)", formatted);
+
+        let formatted = super::format("example(1-1)").unwrap();
+        assert_eq!("example(1 - 1)", formatted);
     }
 
     #[test]

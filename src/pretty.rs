@@ -83,11 +83,7 @@ pub(crate) fn pretty_print(program_expression: RecursiveExpression) -> String {
             }
             RecursiveExpression::FuncLocal(ident, args) => {
                 write!(output, "{ident}(").unwrap();
-                args.iter()
-                    .rev()
-                    .for_each(|node| delve(node, output, indent + 1));
-                let args_iter = args.iter();
-                args_iter.for_each(|node| {
+                args.iter().for_each(|node| {
                     delve(node, output, indent + 1);
                     output.push_str(", ");
                 });
