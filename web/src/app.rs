@@ -6,7 +6,7 @@ use yew::prelude::*;
 
 use xpress_calc::vm::{Instruction, VM};
 
-use crate::app::browser_sys::log;
+use crate::{app::browser_sys::log, console_log};
 
 mod browser_sys;
 
@@ -26,7 +26,7 @@ pub fn app() -> Html {
             let result = result.clone();
             let invalid_state = invalid_state.clone();
             move |x: f64| {
-                log(&format!("<computed>: {x}"));
+                console_log!("<computed>: {x}");
                 result.set(Some(x));
                 invalid_state.set(false);
             }
@@ -74,7 +74,7 @@ pub fn app() -> Html {
             let elem: &web_sys::Element = target.dyn_ref().unwrap();
             let text = elem.text_content().unwrap();
             let c = text.chars().last().unwrap();
-            log(&format!("clicked {text}"));
+            console_log!("clicked {text}");
 
             if c == '⌫' {
                 if let Some((end, _)) = expression
@@ -91,7 +91,7 @@ pub fn app() -> Html {
                 shift_mode.set(!*shift_mode);
             } else if text.as_str() == "ABC" {
                 if let Err(e) = browser_sys::show_virtual_kb() {
-                    log(&format!("ERROR on show_virtual_kb: {e}"))
+                    console_log!("ERROR on show_virtual_kb: {e}")
                 }
             } else if c == '📋' {
                 let expression = expression.clone();
@@ -99,7 +99,7 @@ pub fn app() -> Html {
                     expression.set(format!("{}{}", &*expression, s.as_string().unwrap()))
                 };
                 if let Err(e) = browser_sys::paste_clipboard(on_paste) {
-                    log(&format!("ERROR on paste_clipboard: {e}"))
+                    console_log!("ERROR on paste_clipboard: {e}")
                 }
             } else if text.as_str() == "AC" {
                 expression.set(String::new());
@@ -301,7 +301,7 @@ fn apply_current_expression(vm: &mut VM, expression: &str) -> String {
             vm.run(&program)
         })
         .and_then(|_| vm.pop_result().ok_or_else(|| String::from("no result")))
-        .map_err(|err| log(&format!("ERROR: {err}")));
+        .map_err(|err| console_log!("ERROR: {err}"));
 
     result.map_or_else(|_| ident.unwrap_or(String::new()), |x| x.to_string())
 }
