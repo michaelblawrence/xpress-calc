@@ -8,6 +8,8 @@ use xpress_calc::vm::{Instruction, VM};
 
 use crate::{app::browser_sys::log, console_log};
 
+use self::browser_sys::timer::TimeoutTimer;
+
 mod browser_sys;
 
 #[function_component(App)]
@@ -17,6 +19,12 @@ pub fn app() -> Html {
     let shift_mode = use_state_eq(|| false);
     let invalid_state = use_state_eq(|| false);
     let vm = use_state(|| RefCell::new(VM::new()));
+
+    #[derive(Default)]
+    struct TimerHandle {
+        fmt_btn: Option<TimeoutTimer>,
+    }
+    let timer_handles = use_mut_ref(|| TimerHandle::default());
 
     use_effect_with(expression.clone(), {
         let result = result.clone();
@@ -126,6 +134,49 @@ pub fn app() -> Html {
     let onmousedown = Callback::from(move |_: MouseEvent| browser_sys::vibrate(40));
 
     let expression_clone = expression.clone();
+    let timer_handles_clone = timer_handles.clone();
+    let fmt_btn_oncursordown = move || {
+        let expression = expression_clone.clone();
+        let handle = browser_sys::timeout(200).with_callback(move || {
+            console_log!("fmt_btn held down");
+            match xpress_calc::format(&*expression) {
+                Ok(formatted) => {
+                    if formatted.as_str() != expression.as_str() {
+                        log("using pretty printed expression");
+                        expression.set(formatted);
+                        browser_sys::vibrate(40);
+                    }
+                }
+                Err(e) => console_log!("unable to pretty print expression: {e}"),
+            }
+        });
+        timer_handles_clone.borrow_mut().fmt_btn = Some(handle);
+    };
+    let timer_handles_clone = timer_handles.clone();
+    let fmt_btn_oncursorup = move || {
+        if let Some(handle) = &timer_handles_clone.borrow().fmt_btn {
+            handle.cancel();
+        }
+    };
+
+    let fmt_btn_onmousedown = Callback::from({
+        let fmt_btn_oncursordown = fmt_btn_oncursordown.clone();
+        move |_: MouseEvent| fmt_btn_oncursordown()
+    });
+    let fmt_btn_onmouseup = Callback::from({
+        let fmt_btn_oncursorup = fmt_btn_oncursorup.clone();
+        move |_: MouseEvent| fmt_btn_oncursorup()
+    });
+    let fmt_btn_ontouchstart = Callback::from({
+        let fmt_btn_oncursordown = fmt_btn_oncursordown.clone();
+        move |_: TouchEvent| fmt_btn_oncursordown()
+    });
+    let fmt_btn_ontouchend = Callback::from({
+        let fmt_btn_oncursorup = fmt_btn_oncursorup.clone();
+        move |_: TouchEvent| fmt_btn_oncursorup()
+    });
+
+    let expression_clone = expression.clone();
     let oninput = Callback::from(move |input_event: InputEvent| {
         let event: Event = input_event.dyn_into().unwrap_throw();
         let event_target = event.target().unwrap_throw();
@@ -193,7 +244,10 @@ pub fn app() -> Html {
     html! {
         <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-gray-900","select-none","shadow-lg","border","border-gray-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
             <div>
-            <div class={classes!("p-5","text-white","text-center","text-3xl","bg-gray-900")}><span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}</div>
+            <div onmousedown={fmt_btn_onmousedown} onmouseup={fmt_btn_onmouseup} ontouchstart={fmt_btn_ontouchstart} ontouchend={fmt_btn_ontouchend}
+            class={classes!("p-5","text-white","text-center","text-3xl","bg-gray-900")}>
+                <span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}
+            </div>
             <input
                 type={"url"}
                 value={expression.clone()}
