@@ -19,6 +19,12 @@
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="msapplication-config" content="browserconfig.xml">
     <meta name="theme-color" content="#164e63">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register("serviceworker.js");
+        }
+    </script>
 </head>
 
 <body style="background-color: black;"></body>
