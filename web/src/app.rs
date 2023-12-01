@@ -212,7 +212,7 @@ pub fn app() -> Html {
     let onmousedown_clone = onmousedown.clone();
     let main_btn = move |label: &str| {
         html! {
-            <div onclick={onclick_clone.clone()} onmousedown={onmousedown_clone.clone()} class={classes!("flex-1","px-2","py-2","justify-center","flex","items-center","text-white","text-2xl","font-semibold")}>
+            <div onclick={onclick_clone.clone()} onmousedown={onmousedown_clone.clone()} class={classes!("flex-1","px-2","py-2","justify-center","flex","items-center","text-white","text-4xl","font-semibold")}>
                 <div class={classes!("rounded-full","h-20","w-20","flex","items-center","bg-gray-800","justify-center","shadow-lg","border-2","border-gray-700","hover:border-2","hover:border-gray-500","focus:outline-none")}>{label}</div>
             </div>
         }
@@ -236,7 +236,6 @@ pub fn app() -> Html {
                 <span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}
             </div>
             <input
-                type={"url"}
                 value={expression.clone()}
                 {oninput}
                 {onkeypress}
