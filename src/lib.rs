@@ -40,10 +40,22 @@ pub fn compile(input: &str) -> Result<Vec<vm::Instruction>, String> {
 }
 
 pub fn format(input: &str) -> Result<String, String> {
+    format_impl(input, pretty::PrettyFormat::Spaced)
+}
+
+pub fn format_pretty(input: &str) -> Result<String, String> {
+    format_impl(input, pretty::PrettyFormat::Indented)
+}
+
+pub fn minify(input: &str) -> Result<String, String> {
+    format_impl(input, pretty::PrettyFormat::Minified)
+}
+
+fn format_impl(input: &str, which: pretty::PrettyFormat) -> Result<String, String> {
     let tokens = tokenize(input)?;
     let mut compiler = Compiler::new(&tokens);
     let expression_tree = compiler.compile_expression_tree()?;
-    let formatted = pretty::pretty_print(expression_tree);
+    let formatted = pretty::pretty_print(expression_tree, which);
     Ok(formatted)
 }
 
@@ -449,6 +461,18 @@ mod tests {
 
         let formatted = super::format("example(1-1)").unwrap();
         assert_eq!("example(1 - 1)", formatted);
+
+        let formatted = super::format("(8 + 9 + 9)*2").unwrap();
+        assert_eq!("(8 + 9 + 9) * 2", formatted);
+
+        let minified = super::minify("let calc= ( x, ) =>sin (90)").unwrap();
+        assert_eq!("let calc=(x)=>sin(90)", minified);
+
+        let minified = super::minify("example(1 - 1)").unwrap();
+        assert_eq!("example(1-1)", minified);
+
+        let minified = super::minify("(8 + 9 + 9)*2").unwrap();
+        assert_eq!("(8+9+9)*2", minified);
     }
 
     #[test]
@@ -461,7 +485,7 @@ mod tests {
 
         let mut bite = bite.chomp(parser::Chomp::whitespace());
         let op = bite
-            .nibble(parser::Chomp::char_any(&['+', '-', '*', '/']))
+            .nibble(parser::Chomp::char_any(['+', '-', '*', '/']))
             .unwrap();
 
         let mut bite = bite.chomp(parser::Chomp::whitespace());
