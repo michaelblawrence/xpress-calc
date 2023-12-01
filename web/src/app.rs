@@ -239,7 +239,7 @@ pub fn app() -> Html {
                 value={expression.clone()}
                 {oninput}
                 {onkeypress}
-                class={classes!("w-full","border-none","pt-12","p-5","pb-0","h-20","select-text","text-white","text-right","text-3xl","bg-gray-800")}
+                class={classes!("w-full","border-none","pt-12","p-5","pb-2","h-20","select-text","text-white","text-right","text-3xl","bg-gray-800")}
                 />
             <div class={classes!("p-4","h-16","select-text","text-white","text-right","text-3xl","bg-gray-800")}>
             <div class={classes!("ph-2", "bg-gray-800")}>
