@@ -1,12 +1,13 @@
-use std::cell::RefCell;
-
 use wasm_bindgen::prelude::*;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
-use xpress_calc::vm::{Instruction, VM};
+use xpress_calc::vm::VM;
 
-use crate::{app::browser_sys::log, console_log};
+use crate::{
+    app::{browser_sys::log, event::ButtonEvent},
+    console_log,
+};
 
 use self::browser_sys::timer::TimeoutTimer;
 
@@ -18,7 +19,7 @@ pub fn app() -> Html {
     let result = use_state(|| None);
     let shift_mode = use_state_eq(|| false);
     let invalid_state = use_state_eq(|| false);
-    let vm = use_state(|| RefCell::new(VM::new()));
+    let vm = use_mut_ref(|| VM::new());
 
     #[derive(Default)]
     struct TimerHandle {
@@ -72,62 +73,50 @@ pub fn app() -> Html {
         }
     });
 
-    let onclick = Callback::from({
+    let create_button_ctx = {
         let expression = expression.clone();
         let invalid_state = invalid_state.clone();
         let shift_mode = shift_mode.clone();
         let vm = vm.clone();
-        move |x: MouseEvent| {
-            let target = x.target().unwrap();
-            let elem: &web_sys::Element = target.dyn_ref().unwrap();
-            let text = elem.text_content().unwrap();
-            let c = text.chars().last().unwrap();
-            console_log!("clicked {text}");
+        move || {
+            let expression_val = (*expression).clone();
+            let expression = expression.clone();
+            let shift_mode = shift_mode.clone();
+            let invalid_state = *invalid_state;
+            let vm = vm.clone();
+            let set_expression = move |x| expression.set(x);
+            let toggle_shift = move || shift_mode.set(!*shift_mode);
+            event::ButtonEventContext::new(
+                expression_val,
+                invalid_state,
+                vm,
+                set_expression,
+                toggle_shift,
+            )
+        }
+    };
 
-            if c == '⌫' {
-                if let Some((end, _)) = expression
-                    .char_indices()
-                    .rev()
-                    .skip_while(|(i, c)| *i == 0 || c.is_whitespace())
-                    .next()
-                {
-                    expression.set(expression[..end].to_string());
-                } else {
-                    expression.set(String::new());
-                }
-            } else if c == '⇪' {
-                shift_mode.set(!*shift_mode);
-            } else if text.as_str() == "ABC" {
-                if let Err(e) = browser_sys::show_virtual_kb() {
-                    console_log!("ERROR on show_virtual_kb: {e}")
-                }
-            } else if c == '📋' {
-                let expression = expression.clone();
-                let on_paste = move |s: JsValue| {
-                    expression.set(format!("{}{}", &*expression, s.as_string().unwrap()))
-                };
-                if let Err(e) = browser_sys::paste_clipboard(on_paste) {
-                    console_log!("ERROR on paste_clipboard: {e}")
-                }
-            } else if text.as_str() == "AC" {
-                expression.set(String::new());
-            } else if text.as_str() == "CALC" {
-                if !*invalid_state {
-                    let next_expression =
-                        apply_current_expression(&mut vm.borrow_mut(), &expression);
-                    expression.set(next_expression);
-                }
-            } else if matches!(c, '√') {
-                expression.set(format!("{} sqrt(", &*expression));
-            } else if matches!(c, '0'..='9' | '.')
-                && (expression.ends_with("- ") || expression.ends_with("+ "))
-            {
-                expression.set(format!("{}{}", &*expression.trim_end(), text));
-            } else if c.is_ascii_digit() || matches!(text.as_str(), "c" | "(" | ")" | ".") {
-                expression.set(format!("{}{}", &*expression, text));
-            } else {
-                expression.set(format!("{} {} ", &*expression, text));
-            }
+    let create_button_ctx_clone = create_button_ctx.clone();
+    let onclick = Callback::from(move |x: MouseEvent| {
+        let target = x.target().unwrap();
+        let elem: &web_sys::Element = target.dyn_ref().unwrap();
+        let btn_text = elem.text_content().unwrap();
+        console_log!("clicked {btn_text}");
+        let ctx = create_button_ctx_clone();
+
+        match btn_text.as_str() {
+            "⌫" => ButtonEvent::emit(ButtonEvent::Backspace, ctx),
+            "⇪" => ButtonEvent::emit(ButtonEvent::Shift, ctx),
+            "ABC" => ButtonEvent::emit(ButtonEvent::ShowKeyboard, ctx),
+            "📋" => ButtonEvent::emit(ButtonEvent::PasteClipboard, ctx),
+            "AC" => ButtonEvent::emit(ButtonEvent::AC, ctx),
+            "CALC" => ButtonEvent::emit(ButtonEvent::CALC, ctx),
+            "√" => ButtonEvent::emit(ButtonEvent::EmitSqrt, ctx),
+            "let" => ButtonEvent::emit(ButtonEvent::EmitLet, ctx),
+            "=" => ButtonEvent::emit(ButtonEvent::EmitEqual, ctx),
+            "." => ButtonEvent::emit(ButtonEvent::EmitDP, ctx),
+            "➪" => ButtonEvent::emit(ButtonEvent::EmitFnArrow, ctx),
+            _ => ButtonEvent::emit(ButtonEvent::Emit(btn_text), ctx),
         }
     });
 
@@ -150,7 +139,7 @@ pub fn app() -> Html {
                 Err(e) => console_log!("unable to pretty print expression: {e}"),
             }
         });
-        timer_handles_clone.borrow_mut().fmt_btn = Some(handle);
+        (*timer_handles_clone).borrow_mut().fmt_btn = Some(handle);
     };
     let timer_handles_clone = timer_handles.clone();
     let fmt_btn_oncursorup = move || {
@@ -185,16 +174,14 @@ pub fn app() -> Html {
         expression_clone.set(value);
     });
 
-    let expression_clone = expression.clone();
     let invalid_state_clone = invalid_state.clone();
     let onkeypress = Callback::from(move |kb_event: KeyboardEvent| {
         const ENTER_KEY: u32 = 13;
 
         match kb_event.char_code() {
             ENTER_KEY if !*invalid_state_clone => {
-                let next_expression =
-                    apply_current_expression(&mut vm.borrow_mut(), &expression_clone);
-                expression_clone.set(next_expression);
+                let ctx = create_button_ctx();
+                ButtonEvent::emit(ButtonEvent::CALC, ctx);
             }
             _ => {}
         }
@@ -273,7 +260,7 @@ pub fn app() -> Html {
 
 
         <div class={classes!("flex","items-stretch","bg-gray-900","h-16","mt-4")}>
-            {mini_btn_dual("⇒".into(), "📋".into())}
+            {mini_btn_dual("➪".into(), "📋".into())}
             {mini_btn_dual("𝒂".into(), "f".into())}
             {mini_btn_dual("𝒃".into(), "g".into())}
             {mini_btn_dual("if".into(), "else".into())}
@@ -308,7 +295,7 @@ pub fn app() -> Html {
             {main_btn("4")}
             {main_btn("5")}
             {main_btn("6")}
-            {main_btn("-")}
+            {main_btn("−")}
         </div>
 
         <div class={classes!("flex","items-stretch","bg-gray-900","h-24")}>
@@ -344,22 +331,6 @@ pub fn app() -> Html {
     }
 }
 
-fn apply_current_expression(vm: &mut VM, expression: &str) -> String {
-    let mut ident = None;
-
-    let result = xpress_calc::compile(&*expression)
-        .and_then(|program| {
-            if let Some(Instruction::Assign(set)) = program.last() {
-                ident = Some(set.clone());
-            }
-            vm.run(&program)
-        })
-        .and_then(|_| vm.pop_result().ok_or_else(|| String::from("no result")))
-        .map_err(|err| console_log!("ERROR: {err}"));
-
-    result.map_or_else(|_| ident.unwrap_or(String::new()), |x| x.to_string())
-}
-
 struct ButtonProp {
     label: &'static str,
     theme: Option<&'static str>,
@@ -376,6 +347,153 @@ impl From<(&'static str, &'static str)> for ButtonProp {
         Self {
             label,
             theme: Some(theme),
+        }
+    }
+}
+
+mod event {
+    use std::{cell::RefCell, rc::Rc};
+
+    use wasm_bindgen::JsValue;
+    use xpress_calc::vm::{Instruction, VM};
+
+    use crate::console_log;
+
+    use super::browser_sys;
+
+    pub enum ButtonEvent {
+        Backspace,
+        Shift,
+        ShowKeyboard,
+        PasteClipboard,
+        AC,
+        CALC,
+        EmitSqrt,
+        EmitLet,
+        EmitEqual,
+        EmitDP,
+        EmitFnArrow,
+        Emit(String),
+    }
+
+    pub struct ButtonEventContext {
+        expression: String,
+        invalid_state: bool,
+        vm: Rc<RefCell<VM>>,
+        boxed_set_expression: Box<dyn Fn(String) + 'static>,
+        boxed_toggle_shift: Box<dyn Fn() + 'static>,
+    }
+
+    impl ButtonEventContext {
+        pub fn new(
+            expression: String,
+            invalid_state: bool,
+            vm: Rc<RefCell<VM>>,
+            set_expression: impl Fn(String) + 'static,
+            toggle_shift: impl Fn() + 'static,
+        ) -> Self {
+            Self {
+                expression,
+                invalid_state,
+                vm,
+                boxed_set_expression: Box::new(set_expression),
+                boxed_toggle_shift: Box::new(toggle_shift),
+            }
+        }
+        pub fn append_expression(&self, x: &str) {
+            (self.boxed_set_expression)(format!("{}{}", self.expression, x))
+        }
+        pub fn set_expression(&self, x: String) {
+            (self.boxed_set_expression)(x)
+        }
+        pub fn toggle_shift(&self) {
+            (self.boxed_toggle_shift)()
+        }
+    }
+
+    impl ButtonEvent {
+        pub fn emit(event: ButtonEvent, ctx: ButtonEventContext) {
+            match event {
+                ButtonEvent::Backspace => {
+                    if let Some((end, _)) = ctx
+                        .expression
+                        .char_indices()
+                        .rev()
+                        .skip_while(|(i, c)| *i == 0 || c.is_whitespace())
+                        .next()
+                    {
+                        ctx.set_expression(ctx.expression[..end].to_string());
+                    } else {
+                        ctx.set_expression(String::new());
+                    }
+                }
+                ButtonEvent::Shift => {
+                    ctx.toggle_shift();
+                }
+                ButtonEvent::ShowKeyboard => {
+                    if let Err(e) = browser_sys::show_virtual_kb() {
+                        console_log!("ERROR on show_virtual_kb: {e}")
+                    }
+                }
+                ButtonEvent::PasteClipboard => {
+                    let expression = ctx.expression.to_owned();
+                    let on_paste = move |s: JsValue| {
+                        ctx.set_expression(format!("{}{}", expression, s.as_string().unwrap()))
+                    };
+                    if let Err(e) = browser_sys::paste_clipboard(on_paste) {
+                        console_log!("ERROR on paste_clipboard: {e}")
+                    }
+                }
+                ButtonEvent::AC => {
+                    ctx.set_expression(String::new());
+                }
+                ButtonEvent::CALC => {
+                    if ctx.invalid_state {
+                        return;
+                    }
+
+                    let vm: &mut VM = &mut (*ctx.vm).borrow_mut();
+                    let expression: &str = &ctx.expression;
+                    let mut ident = None;
+
+                    let result = xpress_calc::compile(&*expression)
+                        .and_then(|program| {
+                            if let Some(Instruction::Assign(set)) = program.last() {
+                                ident = Some(set.clone());
+                            }
+                            vm.run(&program)
+                        })
+                        .and_then(|_| vm.pop_result().ok_or_else(|| String::from("no result")));
+
+                    match result {
+                        Ok(x) => ctx.set_expression(x.to_string()),
+                        Err(err) => {
+                            console_log!("ERROR: {err}");
+                            ctx.set_expression(ident.unwrap_or_default())
+                        }
+                    }
+                }
+                ButtonEvent::EmitSqrt => {
+                    ctx.append_expression("sqrt(");
+                }
+                ButtonEvent::EmitLet => {
+                    ctx.append_expression("let ");
+                }
+                ButtonEvent::EmitEqual => {
+                    ctx.append_expression(" = ");
+                }
+                ButtonEvent::EmitDP => {
+                    if !ctx.expression.ends_with('.') {
+                        ctx.append_expression(".");
+                    }
+                }
+                ButtonEvent::EmitFnArrow => {
+                    ctx.append_expression(" ➪ ");
+                }
+                ButtonEvent::Emit(text) => {
+                    ctx.append_expression(&text);
+                }
+            }
         }
     }
 }
