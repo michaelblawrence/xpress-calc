@@ -77,11 +77,11 @@ impl VM {
             match instruction {
                 Instruction::Add => self.binary_op(|lhs, rhs| lhs + rhs)?,
                 Instruction::Sub => self.binary_op(|lhs, rhs| lhs - rhs)?,
-                Instruction::Sine => self.uanry_op(|x| x.to_radians().sin())?,
-                Instruction::Cosine => self.uanry_op(|x| x.to_radians().cos())?,
-                Instruction::Log => self.uanry_op(|x| x.log10())?,
-                Instruction::Round => self.uanry_op(|x| x.round())?,
-                Instruction::Floor => self.uanry_op(|x| x.floor())?,
+                Instruction::Sine => self.unary_op(|x| x.to_radians().sin())?,
+                Instruction::Cosine => self.unary_op(|x| x.to_radians().cos())?,
+                Instruction::Log => self.unary_op(|x| x.log10())?,
+                Instruction::Round => self.unary_op(|x| x.round())?,
+                Instruction::Floor => self.unary_op(|x| x.floor())?,
                 Instruction::Push(x) => self.push(*x),
                 Instruction::LoadLocal(ident) => self.load_local(&ident),
                 Instruction::Assign(ident) => self.assign(ident)?,
@@ -135,7 +135,7 @@ impl VM {
         }
     }
 
-    fn uanry_op(&mut self, op: impl FnOnce(f64) -> f64) -> Result<(), String> {
+    fn unary_op(&mut self, op: impl FnOnce(f64) -> f64) -> Result<(), String> {
         let operand = self.stack.pop();
         let operand = operand
             .ok_or_else(|| String::from("missing operand"))?
