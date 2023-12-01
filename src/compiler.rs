@@ -41,7 +41,40 @@ pub(crate) enum BinaryOp {
 }
 
 impl BinaryOp {
-    fn precedence(&self) -> usize {
+    fn from_token(token: &Token) -> Option<Self> {
+        match token {
+            Token::Plus => Some(Self::Add),
+            Token::Sub => Some(Self::Sub),
+            Token::Mul => Some(Self::Mul),
+            Token::Div => Some(Self::Div),
+            Token::Mod => Some(Self::Mod),
+            Token::Pow => Some(Self::Pow),
+            Token::Eq => Some(Self::EQ),
+            Token::NotEq => Some(Self::NEQ),
+            Token::LessThan => Some(Self::LT),
+            Token::LessThanEquals => Some(Self::LTE),
+            Token::GreaterThan => Some(Self::GT),
+            Token::GreaterThanEquals => Some(Self::GTE),
+            _ => None,
+        }
+    }
+    fn to_instruction(&self) -> Instruction {
+        match self {
+            Self::Add => Instruction::Add,
+            Self::Sub => Instruction::Sub,
+            Self::Div => Instruction::Div,
+            Self::Mul => Instruction::Mul,
+            Self::Mod => Instruction::Mod,
+            Self::Pow => Instruction::Pow,
+            Self::EQ => Instruction::CmpEQ,
+            Self::NEQ => Instruction::CmpNEQ,
+            Self::LT => Instruction::CmpLT,
+            Self::LTE => Instruction::CmpLTE,
+            Self::GT => Instruction::CmpGT,
+            Self::GTE => Instruction::CmpGTE,
+        }
+    }
+    pub fn precedence(&self) -> usize {
         match self {
             Self::Pow | Self::Mod => 3,
             Self::Mul | Self::Div => 2,
@@ -120,20 +153,7 @@ impl<'a> Compiler<'a> {
                 RecursiveExpression::BinaryOp(lhs, op, rhs) => {
                     delve(lhs, stream);
                     delve(rhs, stream);
-                    match op {
-                        BinaryOp::Add => stream.push(Instruction::Add),
-                        BinaryOp::Sub => stream.push(Instruction::Sub),
-                        BinaryOp::Div => stream.push(Instruction::Div),
-                        BinaryOp::Mul => stream.push(Instruction::Mul),
-                        BinaryOp::Mod => stream.push(Instruction::Mod),
-                        BinaryOp::Pow => stream.push(Instruction::Pow),
-                        BinaryOp::EQ => stream.push(Instruction::CmpEQ),
-                        BinaryOp::NEQ => stream.push(Instruction::CmpNEQ),
-                        BinaryOp::LT => stream.push(Instruction::CmpLT),
-                        BinaryOp::LTE => stream.push(Instruction::CmpLTE),
-                        BinaryOp::GT => stream.push(Instruction::CmpGT),
-                        BinaryOp::GTE => stream.push(Instruction::CmpGTE),
-                    }
+                    stream.push(op.to_instruction());
                 }
                 RecursiveExpression::Func0(op) => match op {
                     Func0Op::Rand => stream.push(Instruction::PushRandom),
@@ -416,23 +436,14 @@ impl<'a> Compiler<'a> {
     }
 
     fn peek_binary_op(&mut self) -> Option<BinaryOp> {
-        match self.peek()? {
-            Token::Plus => Some(BinaryOp::Add),
-            Token::Sub => Some(BinaryOp::Sub),
-            Token::Mul => Some(BinaryOp::Mul),
-            Token::Div => Some(BinaryOp::Div),
-            Token::Mod => Some(BinaryOp::Mod),
-            Token::Pow => Some(BinaryOp::Pow),
-            Token::Eq => Some(BinaryOp::EQ),
-            Token::NotEq => Some(BinaryOp::NEQ),
-            Token::LessThan => Some(BinaryOp::LT),
-            Token::LessThanEquals => Some(BinaryOp::LTE),
-            Token::GreaterThan => Some(BinaryOp::GT),
-            Token::GreaterThanEquals => Some(BinaryOp::GTE),
-
-            Token::OpenParen => Some(BinaryOp::Mul),
-            Token::Identifier(_) => Some(BinaryOp::Mul),
-            _ => None,
+        let token = self.peek()?;
+        match BinaryOp::from_token(token) {
+            Some(op) => Some(op),
+            _ => match token {
+                Token::OpenParen => Some(BinaryOp::Mul),
+                Token::Identifier(_) => Some(BinaryOp::Mul),
+                _ => None,
+            },
         }
     }
 
