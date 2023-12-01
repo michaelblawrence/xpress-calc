@@ -5,13 +5,14 @@ use yew::prelude::*;
 use xpress_calc::vm::VM;
 
 use crate::{
-    app::{browser_sys::log, event::ButtonEvent},
+    app::{browser_sys::log, event::ButtonEvent, menu::HamburgerMenu},
     console_log,
 };
 
 use self::browser_sys::timer::TimeoutTimer;
 
 mod browser_sys;
+mod menu;
 
 #[function_component(App)]
 pub fn app() -> Html {
@@ -19,6 +20,7 @@ pub fn app() -> Html {
     let result = use_state(|| None);
     let shift_mode = use_state_eq(|| false);
     let invalid_state = use_state_eq(|| false);
+    let menu_opened = use_state_eq(|| false);
     let vm = use_mut_ref(|| VM::new());
 
     #[derive(Default)]
@@ -187,6 +189,10 @@ pub fn app() -> Html {
         }
     });
 
+    let set_expression = {
+        let expression = expression.clone();
+        move |x: String| expression.set(x)
+    };
     let expression = &*expression;
     let result = &*result;
     let onclick_clone = onclick.clone();
@@ -231,6 +237,7 @@ pub fn app() -> Html {
     html! {
         <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-gray-900","select-none","shadow-lg","border","border-gray-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
             <div>
+            <HamburgerMenu on_open_changed={move |x| menu_opened.set(x)} expression={(*expression).clone()} on_expression_changed={set_expression} />
             <div onmousedown={fmt_btn_onmousedown} onmouseup={fmt_btn_onmouseup} ontouchstart={fmt_btn_ontouchstart} ontouchend={fmt_btn_ontouchend}
             class={classes!("p-5","text-white","text-center","text-3xl","bg-gray-900")}>
                 <span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}
@@ -263,7 +270,7 @@ pub fn app() -> Html {
             {mini_btn_dual("𝒂".into(), "f".into())}
             {mini_btn_dual("𝒃".into(), "g".into())}
             {mini_btn_dual("if".into(), "else".into())}
-            {mini_btn_dual(";".into(), "𝜋".into())}
+            {mini_btn_dual(";".into(), ",".into())}
             {mini_btn(ButtonProp {label: "⇪", theme: shift_mode.then_some("bg-yellow-900")})}
         </div>
 

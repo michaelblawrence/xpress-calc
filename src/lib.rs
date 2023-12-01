@@ -59,7 +59,7 @@ fn format_impl(input: &str, which: pretty::PrettyFormat) -> Result<String, Strin
     Ok(formatted)
 }
 
-fn tokenize(input: &str) -> Result<Vec<lexer::Token>, String> {
+pub fn tokenize(input: &str) -> Result<Vec<lexer::Token>, String> {
     let source = parser::Bite::new(&input).chomp(parser::Chomp::whitespace());
     let tokens = lexer::tokenize(source).collect();
     match tokens {
