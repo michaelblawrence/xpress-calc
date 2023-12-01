@@ -113,6 +113,8 @@ pub(crate) fn pretty_print(program_expression: RecursiveExpression, which: Prett
                     Func1Op::Cos => output.push_str("cos("),
                     Func1Op::Sqrt => output.push_str("sqrt("),
                     Func1Op::Log => output.push_str("log("),
+                    Func1Op::Round => output.push_str("round("),
+                    Func1Op::Floor => output.push_str("floor("),
                 }
                 delve(value, Some(inner), output, indent + 1, which);
                 output.push(')');

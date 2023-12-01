@@ -12,6 +12,8 @@ pub enum Token {
     Sine,
     Cosine,
     Log,
+    Round,
+    Floor,
     OpenParen,
     CloseParen,
     OpenCurly,
@@ -86,6 +88,10 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         Token::Cosine
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("rand")) {
         Token::Rand
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("round")) {
+        Token::Round
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal("floor")) {
+        Token::Floor
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("let")) {
         Token::Let
     } else if let Some(_) = bite.nibble(parser::Chomp::literal("if")) {

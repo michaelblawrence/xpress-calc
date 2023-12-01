@@ -94,6 +94,8 @@ pub(crate) enum Func1Op {
     Cos,
     Sqrt,
     Log,
+    Round,
+    Floor,
 }
 
 impl<'a> Compiler<'a> {
@@ -168,6 +170,8 @@ impl<'a> Compiler<'a> {
                             stream.push(Instruction::Pow);
                         }
                         Func1Op::Log => stream.push(Instruction::Log),
+                        Func1Op::Round => stream.push(Instruction::Round),
+                        Func1Op::Floor => stream.push(Instruction::Floor),
                     }
                 }
                 RecursiveExpression::FuncLocal(ident, args) => {
@@ -460,6 +464,8 @@ impl<'a> Compiler<'a> {
             Token::Cosine => Some(Func1Op::Cos),
             Token::Sqrt => Some(Func1Op::Sqrt),
             Token::Log => Some(Func1Op::Log),
+            Token::Round => Some(Func1Op::Round),
+            Token::Floor => Some(Func1Op::Floor),
             _ => None,
         }
     }

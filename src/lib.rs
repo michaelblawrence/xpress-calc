@@ -212,6 +212,20 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_round() {
+        let mut vm = VM::new();
+        assert_eq!(3.0, compute(&mut vm, "round(3.1)").unwrap().round());
+        assert_eq!(4.0, compute(&mut vm, "round(3.5)").unwrap().round());
+    }
+
+    #[test]
+    fn can_compute_floor() {
+        let mut vm = VM::new();
+        assert_eq!(3.0, compute(&mut vm, "floor(3.1)").unwrap().round());
+        assert_eq!(3.0, compute(&mut vm, "floor(3.5)").unwrap().round());
+    }
+
+    #[test]
     fn can_compile_add() {
         let mut instructions = instr_iter("90 + 20").into_iter();
 
