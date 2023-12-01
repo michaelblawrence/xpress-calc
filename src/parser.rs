@@ -80,7 +80,7 @@ impl<'a> Chomp<()> {
         let mut seen_dp = false;
         Chomp {
             matcher: move |x: &str| {
-                if x.split_once(|x: char| !x.is_ascii_digit() && !['.', '-'].contains(&x))
+                if x.split_once(|x: char| !x.is_ascii_digit() && !['.', '-', '−'].contains(&x))
                     .map_or(false, |(x, _)| {
                         x.len() <= 2 && !x.starts_with(|c| char::is_ascii_digit(&c))
                     })
@@ -89,7 +89,7 @@ impl<'a> Chomp<()> {
                 }
                 matchers::matches(
                     |z| match z {
-                        (0, '-') => true,
+                        (0, '-' | '−') => true,
                         (_, '.') if !seen_dp => {
                             seen_dp = true;
                             true
@@ -112,9 +112,11 @@ impl<'a> Chomp<()> {
             matcher: move |x: &str| matchers::char_matches(move |(_, x)| *x == c, x),
         }
     }
-    pub fn char_any(c: &'a [char]) -> Chomp<impl Fn(&'a str) -> Option<usize>> {
+    pub fn char_any<const N: usize>(c: [char; N]) -> Chomp<impl Fn(&'a str) -> Option<usize>> {
         Chomp {
-            matcher: move |x: &str| matchers::char_matches(move |(_, x)| c.contains(x), x),
+            matcher: move |x: &str| {
+                matchers::char_matches(move |(_, x)| c.into_iter().any(|c| *x == c), x)
+            },
         }
     }
 }

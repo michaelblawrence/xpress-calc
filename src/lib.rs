@@ -255,6 +255,13 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_with_alternative_chars() {
+        let mut vm = VM::new();
+        assert_eq!(25352.0, compute(&mut vm, "78÷0.2×65−1+3").unwrap().round());
+        assert_eq!(2.0, compute(&mut vm, "−1+3").unwrap().round());
+    }
+
+    #[test]
     fn can_compute_pow() {
         let mut vm = VM::new();
         assert_eq!(9.0, compute(&mut vm, "3 ^ 2").unwrap().round());

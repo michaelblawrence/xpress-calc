@@ -103,7 +103,9 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         && !matches!(last_token, Some(Token::LiteralNum(_)))
     {
         let literal = bite.nibble(parser::Chomp::any_number()).unwrap();
-        Token::LiteralNum(parse(literal)?)
+        // HACK: f64::from_str does not parse non-ascii char '−' (taken from google pixel's calc app)
+        let replaced_literal = literal.replace('−', "-");
+        Token::LiteralNum(parse(&replaced_literal)?)
     } else if let Some(_) = bite.nibble(parser::Chomp::char('(')) {
         Token::OpenParen
     } else if let Some(_) = bite.nibble(parser::Chomp::char(')')) {
@@ -112,7 +114,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         Token::OpenCurly
     } else if let Some(_) = bite.nibble(parser::Chomp::char('}')) {
         Token::CloseCurly
-    } else if let Some(_) = bite.nibble(parser::Chomp::literal("=>").or(parser::Chomp::char('⇒')))
+    } else if let Some(_) =
+        bite.nibble(parser::Chomp::literal("=>").or(parser::Chomp::char_any(['⇒', '➪'])))
     {
         Token::LeftArrow
     } else if let Some(_) = bite.nibble(parser::Chomp::char(',')) {
@@ -137,11 +140,11 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         Token::GreaterThan
     } else if let Some(_) = bite.nibble(parser::Chomp::char('+')) {
         Token::Plus
-    } else if let Some(_) = bite.nibble(parser::Chomp::char('-')) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::char_any(['-', '−'])) {
         Token::Sub
-    } else if let Some(_) = bite.nibble(parser::Chomp::char('*').or(parser::Chomp::char('×'))) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::char_any(['*', '×'])) {
         Token::Mul
-    } else if let Some(_) = bite.nibble(parser::Chomp::char('/').or(parser::Chomp::char('÷'))) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::char_any(['/', '÷'])) {
         Token::Div
     } else if let Some(_) = bite.nibble(parser::Chomp::char('^')) {
         Token::Pow
@@ -150,7 +153,7 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         Token::Mod
     } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric()) {
         Token::Identifier(indent.to_string())
-    } else if let Some(indent) = bite.nibble(parser::Chomp::char_any(&['𝒂', '𝒃', '𝒙', '𝒚']))
+    } else if let Some(indent) = bite.nibble(parser::Chomp::char_any(['𝒂', '𝒃', '𝒙', '𝒚']))
     {
         Token::Identifier(indent.to_string())
     } else {
