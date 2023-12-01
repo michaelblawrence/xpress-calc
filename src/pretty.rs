@@ -16,19 +16,19 @@ pub(crate) fn pretty_print(program_expression: RecursiveExpression, which: Prett
         match inner {
             RecursiveExpression::Block(statements) => {
                 output.push('{');
-                which.push_newline(output);
+                which.push_newline(output, indent.saturating_sub(1));
 
                 statements.iter().for_each(|node| {
-                    delve(node, Some(inner), output, indent + 1, which);
+                    delve(node, Some(inner), output, indent, which);
                     output.push_str(";");
-                    which.push_newline(output);
+                    which.push_newline(output, indent);
                 });
 
                 *output = output
-                    .trim_end_matches(|c| matches!(c, ';' | '\n'))
+                    .trim_end_matches(|c| matches!(c, ';' | '\n' | ' '))
                     .to_string();
 
-                which.push_newline(output);
+                which.push_newline(output, indent.saturating_sub(2));
                 output.push('}');
             }
             RecursiveExpression::Literal(x) => write!(output, "{x}").unwrap(),
@@ -145,11 +145,16 @@ pub enum PrettyFormat {
 }
 
 impl PrettyFormat {
-    fn push_newline(&self, output: &mut String) {
+    fn push_newline(&self, output: &mut String, indent: usize) {
         match self {
             PrettyFormat::Minified => (),
             PrettyFormat::Spaced => output.push(' '),
-            PrettyFormat::Indented => output.push('\n'),
+            PrettyFormat::Indented => {
+                output.push('\n');
+                if indent > 0 {
+                    output.push_str(&" ".repeat(indent * 4));
+                }
+            }
         }
     }
     fn push_space(&self, output: &mut String) {

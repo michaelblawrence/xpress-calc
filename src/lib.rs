@@ -487,6 +487,20 @@ mod tests {
 
         let minified = super::minify("(8 + 9 + 9)*2").unwrap();
         assert_eq!("(8+9+9)*2", minified);
+
+        let indented = super::format_pretty(
+            "let fib = (x) => { if (x < 2) { 1 } else { fib(x - 2) + fib(x - 1) }",
+        )
+        .unwrap();
+        let expected = r#"
+let fib = (x) => {
+    if (x < 2) {
+        1
+    } else {
+        fib(x - 2) + fib(x - 1)
+    }
+}"#;
+        assert_eq!(expected.trim(), indented.trim());
     }
 
     #[test]
