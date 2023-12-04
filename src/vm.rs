@@ -193,6 +193,14 @@ impl VM {
             return Ok(());
         }
 
+        if identifier == "dbg" {
+            println!(
+                "entered dbg point '{value}'. vm state = {self:#?}",
+                value = value.as_number()
+            );
+            return Ok(());
+        }
+
         self.scopes
             .put(identifier.to_string(), value)
             .expect("failed to put local");
