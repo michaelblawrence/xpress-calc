@@ -1,10 +1,32 @@
 use js_sys::{Function, Promise};
 use wasm_bindgen::prelude::*;
 
+use crate::console_log;
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     pub fn log(s: &str);
+}
+
+pub fn get_or_insert_storage_item(
+    key: &str,
+    value: &serde_json::Value,
+) -> Result<serde_json::Value, ()> {
+    if let Some(value) = sys::local_storage().get_item(key).ok().flatten() {
+        serde_json::from_str(&value)
+            .map_err(|e| console_log!("failed to deserialize storage item '{key}': {e}"))
+    } else {
+        let json = serde_json::to_string(value)
+            .map_err(|e| console_log!("failed to serialize storage item '{key}': {e}"))?;
+        sys::local_storage().set_item(key, &json).map_err(|_| ())?;
+        Ok(value.to_owned())
+    }
+}
+
+pub fn set_storage_item(key: &str, value: &str) -> Result<String, ()> {
+    sys::local_storage().set_item(key, value).map_err(|_| ())?;
+    Ok(value.to_owned())
 }
 
 pub fn timeout(ms: u32) -> timer::TimeoutTimer {
@@ -106,6 +128,9 @@ pub mod timer {
 mod sys {
     use super::*;
 
+    pub fn local_storage() -> web_sys::Storage {
+        web_sys::window().unwrap().local_storage().unwrap().unwrap()
+    }
     pub fn navigator() -> web_sys::Navigator {
         web_sys::window().unwrap().navigator()
     }
