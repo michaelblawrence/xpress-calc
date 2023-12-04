@@ -14,9 +14,28 @@ use self::browser_sys::timer::TimeoutTimer;
 mod browser_sys;
 mod menu;
 
+const LOCAL_STORAGE_KEY_HISTORY: &str = "expr_history";
+const LOCAL_STORAGE_KEY_COMMANDS: &str = "expr_cmd_palette";
+
 #[function_component(App)]
 pub fn app() -> Html {
     let expression = use_state(|| String::from(""));
+    let expression_history = use_mut_ref(|| {
+        browser_sys::get_or_insert_storage_item(
+            LOCAL_STORAGE_KEY_HISTORY,
+            &serde_json::Value::Array(vec![]),
+        )
+        .map_err(|_| console_log!("failed to use local storage"))
+        .unwrap_or_else(|_| serde_json::Value::Array(vec![]))
+    });
+    let expression_palette = use_mut_ref(|| {
+        browser_sys::get_or_insert_storage_item(
+            LOCAL_STORAGE_KEY_COMMANDS,
+            &serde_json::Value::Array(vec![]),
+        )
+        .map_err(|_| console_log!("failed to use local storage"))
+        .unwrap_or_else(|_| serde_json::Value::Array(vec![]))
+    });
     let result = use_state(|| None);
     let shift_mode = use_state_eq(|| false);
     let invalid_state = use_state_eq(|| false);
@@ -77,22 +96,43 @@ pub fn app() -> Html {
 
     let create_button_ctx = {
         let expression = expression.clone();
+        let expression_history = expression_history.clone();
         let invalid_state = invalid_state.clone();
         let shift_mode = shift_mode.clone();
         let vm = vm.clone();
         move || {
             let expression_val = (*expression).clone();
             let expression = expression.clone();
+            let expression_history = expression_history.clone();
             let shift_mode = shift_mode.clone();
             let invalid_state = *invalid_state;
             let vm = vm.clone();
             let set_expression = move |x| expression.set(x);
+            let add_history_item = move |x: String| {
+                if let Some(expression_history) = expression_history.borrow_mut().as_array_mut() {
+                    if let Some(idx) = expression_history.iter().position(|a| a.as_str() == Some(&x)) {
+                        expression_history.remove(idx);
+                    }
+                    let to_delete = expression_history.len().saturating_sub(25);
+                    if to_delete > 0 {
+                        expression_history.splice(0..to_delete, []);
+                    }
+                    console_log!("pushed new history item: '{x}'");
+                    expression_history.push(x.into());
+                }
+                _ = browser_sys::set_storage_item(
+                    LOCAL_STORAGE_KEY_HISTORY,
+                    &expression_history.borrow().to_string(),
+                )
+                .map_err(|_| console_log!("failed to write to local storage"));
+            };
             let toggle_shift = move || shift_mode.set(!*shift_mode);
             event::ButtonEventContext::new(
                 expression_val,
                 invalid_state,
                 vm,
                 set_expression,
+                add_history_item,
                 toggle_shift,
             )
         }
@@ -237,7 +277,13 @@ pub fn app() -> Html {
     html! {
         <div class={classes!("mx-auto","overflow-hidden","mt-2","shadow-lg","mb-2","bg-gray-900","select-none","shadow-lg","border","border-gray-700","rounded-lg","lg:w-2/6","md:w-3/6","sm:w-4/6")}>
             <div>
-            <HamburgerMenu on_open_changed={move |x| menu_opened.set(x)} expression={(*expression).clone()} on_expression_changed={set_expression} />
+            <HamburgerMenu
+                opened={*menu_opened}
+                on_open_changed={move |x| menu_opened.set(x)}
+                expression={(*expression).clone()}
+                on_expression_changed={set_expression}
+                expression_palette={expression_palette.borrow().clone()}
+                expression_history={expression_history.borrow().clone()} />
             <div onmousedown={fmt_btn_onmousedown} onmouseup={fmt_btn_onmouseup} ontouchstart={fmt_btn_ontouchstart} ontouchend={fmt_btn_ontouchend}
             class={classes!("p-5","text-white","text-center","text-3xl","bg-gray-900")}>
                 <span class={classes!("text-blue-500")}>{"XPRESS"}</span>{"CALC"}
@@ -387,6 +433,7 @@ mod event {
         invalid_state: bool,
         vm: Rc<RefCell<VM>>,
         boxed_set_expression: Box<dyn Fn(String) + 'static>,
+        boxed_add_history_item: Box<dyn Fn(String) + 'static>,
         boxed_toggle_shift: Box<dyn Fn() + 'static>,
     }
 
@@ -396,6 +443,7 @@ mod event {
             invalid_state: bool,
             vm: Rc<RefCell<VM>>,
             set_expression: impl Fn(String) + 'static,
+            add_history_item: impl Fn(String) + 'static,
             toggle_shift: impl Fn() + 'static,
         ) -> Self {
             Self {
@@ -403,6 +451,7 @@ mod event {
                 invalid_state,
                 vm,
                 boxed_set_expression: Box::new(set_expression),
+                boxed_add_history_item: Box::new(add_history_item),
                 boxed_toggle_shift: Box::new(toggle_shift),
             }
         }
@@ -411,6 +460,9 @@ mod event {
         }
         pub fn set_expression(&self, x: String) {
             (self.boxed_set_expression)(x)
+        }
+        pub fn add_history_item(&self, x: String) {
+            (self.boxed_add_history_item)(x)
         }
         pub fn toggle_shift(&self) {
             (self.boxed_toggle_shift)()
@@ -462,14 +514,17 @@ mod event {
                     let expression: &str = &ctx.expression;
                     let mut ident = None;
 
-                    let result = xpress_calc::compile(&*expression)
+                    let result = xpress_calc::compile(expression)
                         .and_then(|program| {
                             if let Some(Instruction::Assign(set)) = program.last() {
                                 ident = Some(set.clone());
                             }
                             vm.run(&program)
                         })
-                        .and_then(|_| vm.pop_result().ok_or_else(|| String::from("no result")));
+                        .and_then(|_| {
+                            ctx.add_history_item(expression.to_string());
+                            vm.pop_result().ok_or_else(|| String::from("no result"))
+                        });
 
                     match result {
                         Ok(x) => ctx.set_expression(x.to_string()),

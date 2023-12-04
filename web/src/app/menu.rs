@@ -1,121 +1,111 @@
 use wasm_bindgen::prelude::*;
-use web_sys::HtmlTextAreaElement;
+use web_sys::{Element, HtmlElement, HtmlTextAreaElement};
 use yew::prelude::*;
 
 use crate::console_log;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Clone)]
 pub struct HamburgerMenuProps {
     pub expression: String,
+    #[prop_or_default]
+    pub opened: bool,
     pub on_open_changed: Callback<bool>,
+    pub expression_palette: serde_json::Value,
+    pub expression_history: serde_json::Value,
     #[prop_or_default]
     pub on_expression_changed: Option<Callback<String>>,
 }
 
 #[function_component(HamburgerMenu)]
 pub fn menu(props: &HamburgerMenuProps) -> Html {
-    let opened = use_state(|| false);
-    let editor_mode = use_state_eq(|| false);
-    let text = use_state(|| String::new());
-    let editor_expression = use_state(|| Option::<String>::None);
+    let mode = use_state(|| MenuMode::Hidden);
 
-    let text_clone = text.clone();
-    let editor_mode_clone = editor_mode.clone();
-    let editor_expression_clone = editor_expression.clone();
-    let expression = props.expression.clone();
-    let on_expression_changed = props.on_expression_changed.clone();
-    use_effect_with(opened.clone(), move |opened| {
-        let opened = **opened;
-        if !opened {
-            editor_mode_clone.set(false);
-            let editor_expression = editor_expression_clone
-                .as_ref()
-                .and_then(|x| xpress_calc::format(&x).ok());
-
-            if let (Some(editor_expression), Some(on_expression_changed)) =
-                (editor_expression, on_expression_changed)
-            {
-                if &editor_expression != &expression {
-                    on_expression_changed.emit(editor_expression.clone());
-                }
-            }
-            return;
-        }
-
-        match xpress_calc::format_pretty(&expression) {
-            Ok(formatted) => text_clone.set(formatted),
-            _ => text_clone.set(String::from("<<invalid input>>")),
-        };
+    let mode_clone = mode.clone();
+    use_effect_with(props.opened, move |&x| {
+        mode_clone.set(if x { MenuMode::None } else { MenuMode::Hidden })
     });
 
     let on_open_changed = props.on_open_changed.clone();
-    let opened_clone = opened.clone();
+    let mode_clone = mode.clone();
     let onclick = Callback::from(move |_: MouseEvent| {
-        let next_value = !*opened_clone;
-        opened_clone.set(next_value);
-        on_open_changed.emit(next_value);
+        let next_value = mode_clone.toggled();
+        mode_clone.set(next_value);
+        on_open_changed.emit(next_value.is_open());
     });
 
-    let text_clone = text.clone();
-    let oninput = Callback::from(move |input_event: InputEvent| {
-        let event: Event = input_event.dyn_into().unwrap_throw();
-        let event_target = event.target().unwrap_throw();
-        let target: HtmlTextAreaElement = event_target.dyn_into().unwrap_throw();
-        let value = target.value();
-        text_clone.set(value.clone());
-        if let Ok(_) = xpress_calc::tokenize(&value) {
-            editor_expression.set(Some(value));
-        } else {
-            editor_expression.set(None);
+    let mode_clone = mode.clone();
+    let on_open_changed = props.on_open_changed.clone();
+    let on_mode_changed = Callback::from(move |x: MenuMode| {
+        let opened_changed = mode_clone.is_open() != x.is_open();
+        mode_clone.set(x);
+        if opened_changed {
+            on_open_changed.emit(x.is_open());
         }
     });
 
-    let editor_mode_clone = editor_mode.clone();
-    let btngrp_onclick = Callback::from(move |x: MouseEvent| {
-        let target = x.target().unwrap();
+    let props = Some(*mode)
+        .filter(|x| x.is_open())
+        .map(move |_| props.clone());
+
+    html! {
+        <div>
+        <div class="absolute right-4 top-5 z-30">
+            <HamburgerButton {onclick} focussed={mode.is_open()} />
+        </div>
+        <HamburgerMenuScreen mode={*mode} {on_mode_changed}>
+            if let Some(props) = props {
+                <HamburgerMenuDrawer
+                    mode={*mode}
+                    expression={props.expression}
+                    expression_palette={props.expression_palette}
+                    expression_history={props.expression_history}
+                    on_expression_changed={props.on_expression_changed} />
+            }
+        </HamburgerMenuScreen>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq, Clone)]
+struct HamburgerMenuScreenProps {
+    pub mode: MenuMode,
+    pub on_mode_changed: Callback<MenuMode>,
+    pub children: Html,
+}
+
+#[function_component(HamburgerMenuScreen)]
+fn menu_screen(props: &HamburgerMenuScreenProps) -> Html {
+    let on_mode_changed = props.on_mode_changed.clone();
+    let screen_onclick = Callback::from(move |e: MouseEvent| {
+        if let Some(target_element) = e.target().and_then(|x| x.dyn_into::<Element>().ok()) {
+            if target_element.id() == "screen" {
+                on_mode_changed.emit(MenuMode::Hidden);
+            }
+        }
+    });
+
+    let on_mode_changed = props.on_mode_changed.clone();
+    let btngrp_onclick = Callback::from(move |e: MouseEvent| {
+        e.stop_propagation();
+        let target = e.target().unwrap();
         let elem: &web_sys::Element = target.dyn_ref().unwrap();
         let btn_text = elem.text_content().unwrap();
         console_log!("clicked {btn_text}");
 
         match btn_text.as_str() {
-            "Commands" => {
-                web_sys::window()
-                    .unwrap()
-                    .alert_with_message("commands feature is coming soon")
-                    .unwrap();
-            }
-            "History" => {
-                web_sys::window()
-                    .unwrap()
-                    .alert_with_message("history feature is coming soon")
-                    .unwrap();
-            }
-            "Editor" => editor_mode_clone.set(true),
+            "Commands" => on_mode_changed.emit(MenuMode::Commands),
+            "History" => on_mode_changed.emit(MenuMode::History),
+            "Editor" => on_mode_changed.emit(MenuMode::Editor),
             _ => unreachable!(),
         }
     });
 
     html! {
-        <div>
-        <div class="absolute right-4 top-5 z-30">
-            <button class="relative group" {onclick}>
-                <div class="relative flex overflow-hidden items-center justify-center rounded-full w-[50px] h-[50px] transform transition-all bg-slate-700 ring-0 ring-gray-300 hover:ring-8 group-focus:ring-4 ring-opacity-30 duration-200 shadow-md">
-                <div class="flex flex-col justify-between w-[20px] h-[20px] transform transition-all duration-300 origin-center overflow-hidden">
-                    <div class="bg-white h-[2px] w-7 transform transition-all duration-300 origin-left group-focus:translate-y-6 delay-100"></div>
-                    <div class="bg-white h-[2px] w-7 rounded transform transition-all duration-300 group-focus:translate-y-6 delay-75"></div>
-                    <div class="bg-white h-[2px] w-7 transform transition-all duration-300 origin-left group-focus:translate-y-6"></div>
-
-                    <div class="absolute items-center justify-between transform transition-all duration-500 top-2.5 -translate-x-10 group-focus:translate-x-0 flex w-0 group-focus:w-12">
-                    <div class="absolute bg-white h-[2px] w-5 transform transition-all duration-500 rotate-0 delay-300 group-focus:rotate-45"></div>
-                    <div class="absolute bg-white h-[2px] w-5 transform transition-all duration-500 -rotate-0 delay-300 group-focus:-rotate-45"></div>
-                    </div>
-                </div>
-                </div>
-            </button>
-        </div>
-        if *opened {
-            <div class="absolute left-0 top-0 h-screen w-screen bg-gray-800 x-20">
-            if !*editor_mode {
+        if let MenuMode::Hidden = props.mode {
+            <div id="screen" class={classes!("absolute","left-0","top-0","h-0","w-screen","x-20","transition-all", "bg-gray-950/0")}></div>
+        } else {
+            <div id="screen" class={classes!("absolute","left-0","top-0","h-screen","w-screen","x-20","transition-all", "bg-gray-950/90")} onclick={screen_onclick}>
+            if let MenuMode::None = props.mode {
                 <div class="bg-slate-300 flex items-center justify-center pb-4 pt-24">
 
                     <div class="inline-flex rounded-md shadow-sm" role="group">
@@ -149,11 +139,207 @@ pub fn menu(props: &HamburgerMenuProps) -> Html {
                     </div>
                 </div>
             } else {
-                <textarea class="text-white text-2xl bg-gray-800 font-normal p-8 h-screen w-screen font-mono"
-                    rows="5" cols="33" wrap="off" value={(*text).clone()} {oninput}/>
+                { props.children.clone() }
             }
             </div>
         }
+    }
+}
+
+#[derive(Properties, PartialEq, Clone)]
+struct HamburgerMenuDrawerProps {
+    pub expression: String,
+    pub mode: MenuMode,
+    pub expression_palette: serde_json::Value,
+    pub expression_history: serde_json::Value,
+    pub on_expression_changed: Option<Callback<String>>,
+}
+
+#[function_component(HamburgerMenuDrawer)]
+fn menu_drawer(props: &HamburgerMenuDrawerProps) -> Html {
+    let text = use_state(|| String::new());
+    let editor_expression = use_state(|| Option::<String>::None);
+
+    let text_clone = text.clone();
+    let editor_expression_clone = editor_expression.clone();
+    let expression = props.expression.clone();
+    let on_expression_changed = props.on_expression_changed.clone();
+    use_effect_with(props.mode, move |&mode| {
+        if !mode.is_open() {
+            let editor_expression = editor_expression_clone
+                .as_ref()
+                .and_then(|x| xpress_calc::format(&x).ok());
+
+            if let (Some(editor_expression), Some(on_expression_changed)) =
+                (editor_expression, on_expression_changed)
+            {
+                if &editor_expression != &expression {
+                    on_expression_changed.emit(editor_expression.clone());
+                }
+            }
+            return;
+        }
+
+        match xpress_calc::format_pretty(&expression) {
+            Ok(formatted) => text_clone.set(formatted),
+            _ => text_clone.set(String::from("<<invalid input>>")),
+        };
+    });
+
+    let on_expression_changed = props.on_expression_changed.clone();
+    let history_onclick = Callback::from(move |e: MouseEvent| {
+        if let Some(on_expression_changed) = &on_expression_changed {
+            if let Some(target_element) = e.target().and_then(|x| x.dyn_into::<Element>().ok()) {
+                let text_content = target_element.text_content().unwrap_or_default();
+                console_log!("clicked history item '{text_content}'");
+                on_expression_changed.emit(text_content);
+            }
+        }
+    });
+
+    let on_expression_changed = props.on_expression_changed.clone();
+    let palette_onclick = Callback::from(move |e: MouseEvent| {
+        if let Some(on_expression_changed) = &on_expression_changed {
+            if let Some(target_element) = e.target().and_then(|x| x.dyn_into::<Element>().ok()) {
+                let text_content = target_element.text_content().unwrap_or_default();
+                if let Some(expression) = target_element.get_attribute("data-expr") {
+                    console_log!("clicked command palette item '{text_content}'");
+                    on_expression_changed.emit(expression);
+                }
+            }
+        }
+    });
+
+    let text_clone = text.clone();
+    let oninput = Callback::from(move |input_event: InputEvent| {
+        let event: Event = input_event.dyn_into().unwrap_throw();
+        let event_target = event.target().unwrap_throw();
+        let target: HtmlTextAreaElement = event_target.dyn_into().unwrap_throw();
+        let value = target.value();
+        text_clone.set(value.clone());
+        if let Ok(_) = xpress_calc::tokenize(&value) {
+            editor_expression.set(Some(value));
+        } else {
+            editor_expression.set(None);
+        }
+    });
+
+    html! {
+        <div>
+        if let MenuMode::Editor = props.mode {
+            <textarea class="text-white text-2xl bg-gray-800 font-normal p-8 h-screen w-screen font-mono"
+                rows="5" cols="33" wrap="off" value={(*text).clone()} {oninput}/>
+        } else if let MenuMode::Commands = props.mode {
+            <div class="text-white text-l font-normal p-2">
+                {
+                    for props.expression_palette.as_array()
+                        .unwrap_or(&vec![])
+                        .into_iter()
+                        .filter_map(|v| {
+                            let value = v.get("value");
+                            v.get("label")
+                                .or(value)
+                                .and_then(|x| x.as_str())
+                                .map(|x| (x, v.as_str().unwrap_or_default().to_string()))
+                        })
+                        .map(|(v, data)| html! {
+                            <div class="p-4 mt-2 h-12 bg-gray-800 text-ellipsis whitespace-nowrap overflow-hidden" onclick={palette_onclick.clone()} data-expr={data}>
+                                { v }
+                            </div>
+                        })
+                }
+            </div>
+        } else if let MenuMode::History = props.mode {
+            <div class="text-white text-l font-normal p-2">
+                {
+                    for props.expression_history.as_array()
+                        .unwrap_or(&vec![])
+                        .into_iter()
+                        .map(|v| html! {
+                            <div class="p-4 mt-2 h-12 bg-gray-800 text-ellipsis whitespace-nowrap overflow-hidden" onclick={history_onclick.clone()}>
+                                { v.as_str().unwrap_or("<unknown format>") }
+                            </div>
+                        })
+                }
+            </div>
+        }
         </div>
+    }
+}
+
+#[derive(Properties, PartialEq, Clone)]
+struct HamburgerButtonProps {
+    #[prop_or_default]
+    pub focussed: bool,
+    pub onclick: Callback<MouseEvent>,
+}
+
+#[function_component(HamburgerButton)]
+fn menu_btn(props: &HamburgerButtonProps) -> Html {
+    let onclick_clone = props.onclick.clone();
+    let onclick = Callback::from(move |e: MouseEvent| {
+        if let Some(active_element) = web_sys::window()
+            .and_then(|x| x.document())
+            .and_then(|x| x.active_element())
+            .and_then(|x| x.dyn_into::<HtmlElement>().ok())
+        {
+            _ = active_element.blur();
+        }
+        onclick_clone.emit(e);
+    });
+    html!(
+        <button class="relative group" {onclick}>
+            if props.focussed {
+                <div class="relative flex overflow-hidden items-center justify-center rounded-full w-[50px] h-[50px] transform transition-all bg-slate-700 ring-gray-300 hover:ring-8 ring-4 ring-opacity-30 duration-200 shadow-md">
+                    <div class="flex flex-col justify-between w-[20px] h-[20px] transform transition-all duration-300 origin-center overflow-hidden">
+                        <div class="bg-white h-[2px] w-7 transform transition-all duration-300 origin-left translate-y-6 delay-100"></div>
+                        <div class="bg-white h-[2px] w-7 rounded transform transition-all duration-300 translate-y-6 delay-75"></div>
+                        <div class="bg-white h-[2px] w-7 transform transition-all duration-300 origin-left translate-y-6"></div>
+
+                        <div class="absolute items-center justify-between transform transition-all duration-500 top-2.5 translate-x-0 flex w-12">
+                        <div class="absolute bg-white h-[2px] w-5 transform transition-all duration-500 delay-300 rotate-45"></div>
+                        <div class="absolute bg-white h-[2px] w-5 transform transition-all duration-500 delay-300 -rotate-45"></div>
+                        </div>
+                    </div>
+                </div>
+            } else {
+                <div class="relative flex overflow-hidden items-center justify-center rounded-full w-[50px] h-[50px] transform transition-all bg-slate-700 ring-0 ring-gray-300 hover:ring-8 group-focus:ring-4 ring-opacity-30 duration-200 shadow-md">
+                    <div class="flex flex-col justify-between w-[20px] h-[20px] transform transition-all duration-300 origin-center overflow-hidden">
+                        <div class="bg-white h-[2px] w-7 transform transition-all duration-300 origin-left group-focus:translate-y-6 delay-100"></div>
+                        <div class="bg-white h-[2px] w-7 rounded transform transition-all duration-300 group-focus:translate-y-6 delay-75"></div>
+                        <div class="bg-white h-[2px] w-7 transform transition-all duration-300 origin-left group-focus:translate-y-6"></div>
+
+                        <div class="absolute items-center justify-between transform transition-all duration-500 top-2.5 -translate-x-10 group-focus:translate-x-0 flex w-0 group-focus:w-12">
+                        <div class="absolute bg-white h-[2px] w-5 transform transition-all duration-500 rotate-0 delay-300 group-focus:rotate-45"></div>
+                        <div class="absolute bg-white h-[2px] w-5 transform transition-all duration-500 -rotate-0 delay-300 group-focus:-rotate-45"></div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </button>
+    )
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum MenuMode {
+    Hidden,
+    None,
+    Editor,
+    History,
+    Commands,
+}
+
+impl MenuMode {
+    fn toggled(self) -> Self {
+        match self {
+            Self::Hidden => Self::None,
+            _ => Self::Hidden,
+        }
+    }
+    fn is_open(self) -> bool {
+        match self {
+            Self::Hidden => false,
+            _ => true,
+        }
     }
 }
