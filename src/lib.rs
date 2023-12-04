@@ -466,6 +466,26 @@ mod tests {
         compute(&mut vm, "let calc = () => {}");
         compute(&mut vm, "calc()");
         assert!(vm.pop_result().is_none());
+
+        compute(
+            &mut vm,
+            r#"
+            let repeat = (x, n) => {
+                let c = floor(log(x)) + 1;
+                let y = 0;
+                let loop = (i, fn) => {
+                    if (i > 0) {
+                        fn(i - 1);
+                        loop(i - 1, fn)
+                    }
+                };
+                loop(n, (i) => {
+                    let y = y + (x * 10^(i * c))
+                });
+                y
+            }"#,
+        );
+        assert_eq!(98989898.0, compute(&mut vm, "repeat(98, 4)").unwrap().round());
     }
 
     #[test]
@@ -499,6 +519,29 @@ let fib = (x) => {
     } else {
         fib(x - 2) + fib(x - 1)
     }
+}"#;
+        assert_eq!(expected.trim(), indented.trim());
+    }
+
+    #[test]
+    fn can_pretty_print_large_fns() {
+        let indented = super::format_pretty(
+            "let repeat = (x, n) => { let c = floor(log(x)) + 1; let y = 0; let loop = (i, fn) => { if (i > 0) { fn(i-1) } }; loop(n, (i) => { let y = y + x * 10^(i*c); }); y }",
+        )
+        .unwrap();
+        let expected = r#"
+let repeat = (x, n) => {
+    let c = floor(log(x)) + 1;
+    let y = 0;
+    let loop = (i, fn) => {
+        if (i > 0) {
+            fn(i - 1)
+        }
+    };
+    loop(n, (i) => {
+        let y = y + (x * 10^(i * c))
+    });
+    y
 }"#;
         assert_eq!(expected.trim(), indented.trim());
     }

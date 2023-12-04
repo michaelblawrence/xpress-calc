@@ -16,19 +16,19 @@ pub(crate) fn pretty_print(program_expression: RecursiveExpression, which: Prett
         match inner {
             RecursiveExpression::Block(statements) => {
                 output.push('{');
-                which.push_newline(output, indent.saturating_sub(1));
+                which.push_newline(output, indent + 1);
 
                 statements.iter().for_each(|node| {
-                    delve(node, Some(inner), output, indent, which);
+                    delve(node, Some(inner), output, indent + 1, which);
                     output.push_str(";");
-                    which.push_newline(output, indent);
+                    which.push_newline(output, indent + 1);
                 });
 
                 *output = output
                     .trim_end_matches(|c| matches!(c, ';' | '\n' | ' '))
                     .to_string();
 
-                which.push_newline(output, indent.saturating_sub(2));
+                which.push_newline(output, indent);
                 output.push('}');
             }
             RecursiveExpression::Literal(x) => write!(output, "{x}").unwrap(),
@@ -47,33 +47,34 @@ pub(crate) fn pretty_print(program_expression: RecursiveExpression, which: Prett
                 which.push_space(output);
                 output.push_str("=>");
                 which.push_space(output);
-                delve(body, Some(inner), output, indent + 1, which);
+                delve(body, Some(inner), output, indent, which);
             }
             RecursiveExpression::If(condition, block) => {
                 output.push_str("if (");
-                delve(condition, Some(inner), output, indent + 1, which);
+                delve(condition, Some(inner), output, indent, which);
                 output.push_str(") ");
-                delve(block, Some(inner), output, indent + 1, which);
+                delve(block, Some(inner), output, indent, which);
             }
             RecursiveExpression::IfElse(condition, if_block, else_block) => {
                 output.push_str("if (");
-                delve(condition, Some(inner), output, indent + 1, which);
+                delve(condition, Some(inner), output, indent, which);
                 output.push_str(") ");
-                delve(if_block, Some(inner), output, indent + 1, which);
+                delve(if_block, Some(inner), output, indent, which);
                 output.push_str(" else ");
-                delve(else_block, Some(inner), output, indent + 1, which);
+                delve(else_block, Some(inner), output, indent, which);
             }
             RecursiveExpression::AssignOp(ident, value) => {
                 write!(output, "let {ident}").unwrap();
                 which.push_space(output);
                 output.push('=');
                 which.push_space(output);
-                delve(value, Some(inner), output, indent + 1, which);
+                delve(value, Some(inner), output, indent, which);
             }
             RecursiveExpression::BinaryOp(lhs, op, rhs) => {
                 let requires_parens = match parent {
                     Some(RecursiveExpression::BinaryOp(_, parent_op, _)) => {
-                        parent_op.precedence() != op.precedence()
+                        let precedence = op.precedence();
+                        parent_op.precedence() != precedence && precedence < 3
                     }
                     _ => false,
                 };
@@ -116,13 +117,13 @@ pub(crate) fn pretty_print(program_expression: RecursiveExpression, which: Prett
                     Func1Op::Round => output.push_str("round("),
                     Func1Op::Floor => output.push_str("floor("),
                 }
-                delve(value, Some(inner), output, indent + 1, which);
+                delve(value, Some(inner), output, indent, which);
                 output.push(')');
             }
             RecursiveExpression::FuncLocal(ident, args) => {
                 write!(output, "{ident}(").unwrap();
                 args.iter().for_each(|node| {
-                    delve(node, Some(inner), output, indent + 1, which);
+                    delve(node, Some(inner), output, indent, which);
                     output.push_str(",");
                     which.push_space(output);
                 });
