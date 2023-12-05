@@ -121,25 +121,25 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
     } else if let Some(_) = bite.nibble(parser::Chomp::char('}')) {
         Token::CloseCurly
     } else if let Some(_) =
-        bite.nibble(parser::Chomp::literal("=>").or(parser::Chomp::char_any(['⇒', '➪'])))
+        bite.nibble(parser::Chomp::literal_substring("=>").or(parser::Chomp::char_any(['⇒', '➪'])))
     {
         Token::LeftArrow
     } else if let Some(_) = bite.nibble(parser::Chomp::char(',')) {
         Token::Comma
     } else if let Some(_) = bite.nibble(parser::Chomp::char(';')) {
         Token::Semicolon
-    } else if let Some(_) = bite.nibble(parser::Chomp::literal("==")) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal_substring("==")) {
         Token::Eq
-    } else if let Some(_) = bite.nibble(parser::Chomp::literal("!=")) {
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal_substring("!=")) {
         Token::NotEq
     } else if let Some(_) = bite.nibble(parser::Chomp::char('=')) {
         Token::Equals
-    } else if let Some(_) = bite.nibble(parser::Chomp::literal("<=").or(parser::Chomp::char('≤')))
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal_substring("<=").or(parser::Chomp::char('≤')))
     {
         Token::LessThanEquals
     } else if let Some(_) = bite.nibble(parser::Chomp::char('<')) {
         Token::LessThan
-    } else if let Some(_) = bite.nibble(parser::Chomp::literal(">=").or(parser::Chomp::char('≥')))
+    } else if let Some(_) = bite.nibble(parser::Chomp::literal_substring(">=").or(parser::Chomp::char('≥')))
     {
         Token::GreaterThanEquals
     } else if let Some(_) = bite.nibble(parser::Chomp::char('>')) {
@@ -157,7 +157,7 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
     } else if let Some(_) = bite.nibble(parser::Chomp::char('%').or(parser::Chomp::literal("mod")))
     {
         Token::Mod
-    } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric()) {
+    } else if let Some(indent) = bite.nibble(parser::Chomp::alphanumeric_extended()) {
         Token::Identifier(indent.to_string())
     } else if let Some(indent) = bite.nibble(parser::Chomp::char_any(['𝒂', '𝒃', '𝒙', '𝒚']))
     {

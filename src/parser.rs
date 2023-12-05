@@ -71,6 +71,11 @@ impl<'a> Chomp<()> {
             matcher: matchers::is_alphanumeric,
         }
     }
+    pub fn alphanumeric_extended() -> Chomp<fn(&'a str) -> Option<usize>> {
+        Chomp {
+            matcher: matchers::is_alphanumeric_extended,
+        }
+    }
     pub fn numeric() -> Chomp<fn(&'a str) -> Option<usize>> {
         Chomp {
             matcher: matchers::is_numeric,
@@ -103,6 +108,17 @@ impl<'a> Chomp<()> {
         }
     }
     pub fn literal(pattern: &'a str) -> Chomp<impl FnMut(&'a str) -> Option<usize>> {
+        Chomp {
+            matcher: move |x: &str| {
+                x.starts_with(pattern)
+                    .then(|| {
+                        !x[pattern.len()..].starts_with(|c: char| c.is_alphabetic() || c == '_')
+                    })
+                    .and_then(|x| x.then_some(pattern.len()))
+            },
+        }
+    }
+    pub fn literal_substring(pattern: &'a str) -> Chomp<impl FnMut(&'a str) -> Option<usize>> {
         Chomp {
             matcher: move |x: &str| x.starts_with(pattern).then(|| pattern.len()),
         }
@@ -155,6 +171,9 @@ mod matchers {
     }
     pub fn is_alphanumeric(x: &str) -> Option<usize> {
         matches(|(_, c)| c.is_alphanumeric(), x)
+    }
+    pub fn is_alphanumeric_extended(x: &str) -> Option<usize> {
+        matches(|(_, c)| c.is_alphanumeric() || matches!(c, '_'), x)
     }
     pub fn is_numeric(x: &str) -> Option<usize> {
         matches(|(_, c)| c.is_numeric(), x)
