@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
@@ -13,6 +13,8 @@ pub enum Instruction {
     Assign(String),
     ShadowAssign(String),
     LoadLocal(String),
+    LoadField(String),
+    SetField(String),
     CallRoutine,
     PushRoutine(Vec<Instruction>),
     SkipIfNot(Vec<Instruction>),
@@ -28,13 +30,16 @@ pub enum Instruction {
     CmpLTE,
     CmpGT,
     CmpGTE,
+    Drop,
     Enter,
     Leave,
+    NewObject,
 }
 
 #[derive(Debug, Clone)]
 enum Value {
     Number(f64),
+    Object(Rc<RefCell<HashMap<String, Value>>>),
     Routine(Vec<Instruction>),
 }
 
@@ -43,7 +48,8 @@ impl Value {
         match self {
             Self::Number(v) => *v,
             Self::Routine(routine) if !routine.is_empty() => 1.0,
-            Self::Routine(_) => 0.0,
+            Self::Object(obj) if !obj.borrow().is_empty() => 1.0,
+            Self::Routine(_) | Self::Object(_) => 0.0,
         }
     }
 }
@@ -83,7 +89,11 @@ impl VM {
                 Instruction::Round => self.unary_op(|x| x.round())?,
                 Instruction::Floor => self.unary_op(|x| x.floor())?,
                 Instruction::Push(x) => self.push(*x),
+                Instruction::NewObject => self.stack.push(Value::Object(Default::default())),
+                Instruction::Drop => _ = self.stack.pop(),
                 Instruction::LoadLocal(ident) => self.load_local(&ident),
+                Instruction::LoadField(ident) => self.load_field(&ident),
+                Instruction::SetField(ident) => self.set_field(&ident)?,
                 Instruction::Assign(ident) => self.assign(ident)?,
                 Instruction::ShadowAssign(ident) => self.shadow_assign(ident)?,
                 Instruction::CallRoutine => self.call_routine()?,
@@ -183,6 +193,44 @@ impl VM {
         });
 
         self.stack.push(x.into());
+    }
+
+    fn load_field(&mut self, identifier: &str) {
+        match self.stack.pop() {
+            Some(Value::Object(obj)) => {
+                let value = obj
+                    .borrow()
+                    .get(identifier)
+                    .cloned()
+                    .unwrap_or(Value::Number(0.0));
+                self.stack.push(value);
+            }
+            Some(x) => {
+                eprintln!("WARN: current value has no accessible fields '{x:?}'");
+            }
+            None => {
+                eprintln!("WARN: no current value to access");
+            }
+        }
+    }
+
+    fn set_field(&mut self, identifier: &str) -> Result<(), String> {
+        let value = self.stack.pop();
+        let value = value.ok_or_else(|| String::from("missing assignment value"))?;
+        
+        match self.stack.pop() {
+            Some(Value::Object(obj)) => {
+                obj.borrow_mut().insert(identifier.to_string(), value);
+                self.stack.push(Value::Object(obj));
+            }
+            Some(x) => {
+                eprintln!("WARN: current value has no accessible fields '{x:?}'");
+            }
+            None => {
+                eprintln!("WARN: no current value to access");
+            }
+        }
+        Ok(())
     }
 
     fn assign(&mut self, identifier: &str) -> Result<(), String> {

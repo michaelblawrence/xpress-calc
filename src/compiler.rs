@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{lexer::Token, vm::Instruction};
 
 #[derive(Default)]
@@ -23,6 +25,8 @@ pub(crate) enum RecursiveExpression {
     Func0(Func0Op),
     Func1(Func1Op, Box<RecursiveExpression>),
     FuncLocal(String, Vec<RecursiveExpression>),
+    FieldAccess(Box<RecursiveExpression>, String),
+    ObjectLiteral(HashMap<String, RecursiveExpression>),
 }
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum BinaryOp {
@@ -179,6 +183,17 @@ impl<'a> Compiler<'a> {
                     stream.push(Instruction::LoadLocal(ident.clone()));
                     stream.push(Instruction::CallRoutine);
                 }
+                RecursiveExpression::ObjectLiteral(obj) => {
+                    stream.push(Instruction::NewObject);
+                    obj.into_iter().for_each(|(key, node)| {
+                        delve(node, stream);
+                        stream.push(Instruction::SetField(key.clone()));
+                    });
+                }
+                RecursiveExpression::FieldAccess(lhs, ident) => {
+                    delve(lhs, stream);
+                    stream.push(Instruction::LoadField(ident.clone()));
+                }
             }
         }
 
@@ -272,7 +287,31 @@ impl<'a> Compiler<'a> {
                         self.try_consume(&Token::CloseParen)?;
                         Some(RecursiveExpression::FuncLocal(ident, args))
                     }
+                    Some(Token::Dot) => {
+                        self.parse_field_expression(RecursiveExpression::Local(ident))
+                    }
                     _ => Some(RecursiveExpression::Local(ident)),
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_field_expression(&mut self, lhs: RecursiveExpression) -> Option<RecursiveExpression> {
+        match self.peek()? {
+            Token::Dot => {
+                self.consume()?;
+                let ident = match self.peek()? {
+                    Token::Identifier(ident) => ident.clone(),
+                    _ => {
+                        return None;
+                    }
+                };
+                self.consume()?;
+                let expression = RecursiveExpression::FieldAccess(Box::new(lhs), ident);
+                match self.peek() {
+                    Some(Token::Dot) => self.parse_field_expression(expression),
+                    _ => Some(expression),
                 }
             }
             _ => None,
@@ -293,9 +332,18 @@ impl<'a> Compiler<'a> {
     fn parse_block(&mut self) -> Option<RecursiveExpression> {
         self.try_consume(&Token::OpenCurly)?;
         if let Some(_) = self.try_consume(&Token::CloseCurly) {
-            return Some(RecursiveExpression::Block(vec![]));
+            self.rewind(1);
+            return self.parse_object_literal();
         }
+        if let (Some(Token::Identifier(_)), Some(Token::Colon | Token::Comma)) =
+            (self.peek_offset(0), self.peek_offset(1))
+        {
+            self.rewind(1);
+            return self.parse_object_literal();
+        }
+
         let expression = self.parse_expression()?;
+
         let mut statements = vec![expression];
         if let Some(_) = self.try_consume(&Token::Semicolon) {
             while let Some(expression) = self.parse_expression() {
@@ -307,6 +355,52 @@ impl<'a> Compiler<'a> {
         }
         self.try_consume(&Token::CloseCurly)?;
         Some(RecursiveExpression::Block(statements))
+    }
+
+    fn parse_object_literal(&mut self) -> Option<RecursiveExpression> {
+        self.try_consume(&Token::OpenCurly)?;
+        let mut obj = HashMap::new();
+        let mut current = match self.peek() {
+            Some(Token::Identifier(key)) => Some((key.clone(), false)),
+            Some(Token::CloseCurly) => return Some(RecursiveExpression::ObjectLiteral(obj)),
+            _ => return None,
+        };
+        self.consume()?;
+        loop {
+            match (current, self.peek()?) {
+                (Some((key, false)), Token::Colon) => {
+                    current = Some((key, true));
+                    self.consume();
+                }
+                (Some((key, false)), Token::Comma | Token::CloseCurly) => {
+                    self.rewind(1);
+                    obj.insert(key, self.parse_expression()?);
+                    current = None;
+                    if let Some(_) = self.try_consume(&Token::CloseCurly) {
+                        break;
+                    }
+                    self.try_consume(&Token::Comma)?;
+                }
+                (Some((key, true)), _) => {
+                    obj.insert(key, self.parse_expression()?);
+                    current = None;
+                    if let Some(_) = self.try_consume(&Token::CloseCurly) {
+                        break;
+                    }
+                    self.try_consume(&Token::Comma)?;
+                }
+                (None, Token::Identifier(key)) => {
+                    current = Some((key.clone(), false));
+                    self.consume();
+                }
+                (None, Token::CloseCurly) => {
+                    self.consume();
+                    break;
+                }
+                (_, _) => return None,
+            }
+        }
+        return Some(RecursiveExpression::ObjectLiteral(obj));
     }
 
     fn parse_func_expression(&mut self) -> Option<RecursiveExpression> {
@@ -435,8 +529,16 @@ impl<'a> Compiler<'a> {
         Some(idents)
     }
 
+    fn rewind(&mut self, offset: usize) {
+        self.position = self.position.saturating_sub(offset);
+    }
+
     fn peek(&self) -> Option<&Token> {
         self.program.get(self.position)
+    }
+
+    fn peek_offset(&self, offset: usize) -> Option<&Token> {
+        self.program.get(self.position + offset)
     }
 
     fn peek_binary_op(&mut self) -> Option<BinaryOp> {

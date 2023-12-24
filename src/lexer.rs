@@ -18,6 +18,7 @@ pub enum Token {
     CloseParen,
     OpenCurly,
     CloseCurly,
+    Dot,
     Pow,
     Mod,
     Rand,
@@ -38,6 +39,7 @@ pub enum Token {
     Semicolon,
     Eq,
     NotEq,
+    Colon,
 }
 
 pub fn tokenize<'a>(source: parser::Bite<'a>) -> impl Iterator<Item = Result<Token, String>> + 'a {
@@ -128,6 +130,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         Token::Comma
     } else if let Some(_) = bite.nibble(parser::Chomp::char(';')) {
         Token::Semicolon
+    } else if let Some(_) = bite.nibble(parser::Chomp::char(':')) {
+        Token::Colon
     } else if let Some(_) = bite.nibble(parser::Chomp::literal_substring("==")) {
         Token::Eq
     } else if let Some(_) = bite.nibble(parser::Chomp::literal_substring("!=")) {
@@ -154,6 +158,8 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         Token::Div
     } else if let Some(_) = bite.nibble(parser::Chomp::char('^')) {
         Token::Pow
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('.')) {
+        Token::Dot
     } else if let Some(_) = bite.nibble(parser::Chomp::char('%').or(parser::Chomp::literal("mod")))
     {
         Token::Mod

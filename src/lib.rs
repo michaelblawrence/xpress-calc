@@ -440,6 +440,15 @@ mod tests {
     }
 
     #[test]
+    fn can_compute_fields() {
+        let mut vm = VM::new();
+        compute(&mut vm, "let x = {single: 1, double: 2}");
+
+        assert_eq!(1.0, compute(&mut vm, "x.single").unwrap().round());
+        assert_eq!(2.0, compute(&mut vm, "x.double").unwrap().round());
+    }
+
+    #[test]
     fn can_compute_blocks() {
         let mut vm = VM::new();
         compute(&mut vm, "let x = { let y = 1 + 2; y + 3 }");
@@ -463,8 +472,8 @@ mod tests {
         compute(&mut vm, "let calc = (x, y) => { x^2 + y^2 }");
         assert_eq!(13.0, compute(&mut vm, "calc(2, 3)").unwrap().round());
 
-        compute(&mut vm, "let calc = () => {}");
-        compute(&mut vm, "calc()");
+        compute(&mut vm, "let sin_not_sin = () => {}");
+        compute(&mut vm, "sin_not_sin()");
         assert!(vm.pop_result().is_none());
 
         compute(

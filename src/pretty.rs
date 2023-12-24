@@ -31,6 +31,30 @@ pub(crate) fn pretty_print(program_expression: RecursiveExpression, which: Prett
                 which.push_newline(output, indent);
                 output.push('}');
             }
+            RecursiveExpression::FieldAccess(lhs, ident) => {
+                delve(lhs, Some(inner), output, indent, which);
+                output.push('.');
+                output.push_str(ident);
+            }
+            RecursiveExpression::ObjectLiteral(obj) => {
+                output.push('{');
+                which.push_newline(output, indent + 1);
+
+                obj.iter().for_each(|(key, node)| {
+                    output.push_str(key);
+                    output.push_str(": ");
+                    delve(node, Some(inner), output, indent + 1, which);
+                    output.push(',');
+                    which.push_newline(output, indent + 1);
+                });
+
+                *output = output
+                    .trim_end_matches(|c| matches!(c, '\n' | ' '))
+                    .to_string();
+
+                which.push_newline(output, indent);
+                output.push('}');
+            }
             RecursiveExpression::Literal(x) => write!(output, "{x}").unwrap(),
             RecursiveExpression::Local(ident) => output.push_str(ident),
             RecursiveExpression::FuncDeclaration(params, body) => {
