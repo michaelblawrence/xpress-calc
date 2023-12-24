@@ -10,6 +10,8 @@ pub enum Instruction {
     Round,
     Floor,
     Push(f64),
+    PushString(String),
+    ConcatString,
     Assign(String),
     ShadowAssign(String),
     LoadLocal(String),
@@ -28,6 +30,7 @@ pub enum Instruction {
     CmpLTE,
     CmpGT,
     CmpGTE,
+    NewString,
     Enter,
     Leave,
 }
@@ -35,6 +38,7 @@ pub enum Instruction {
 #[derive(Debug, Clone)]
 enum Value {
     Number(f64),
+    String(Rc<RefCell<String>>),
     Routine(Vec<Instruction>),
 }
 
@@ -43,7 +47,8 @@ impl Value {
         match self {
             Self::Number(v) => *v,
             Self::Routine(routine) if !routine.is_empty() => 1.0,
-            Self::Routine(_) => 0.0,
+            Self::String(s) if !s.borrow().is_empty() => 1.0,
+            Self::Routine(_) | Self::String(_) => 0.0,
         }
     }
 }
@@ -57,6 +62,12 @@ impl From<Vec<Instruction>> for Value {
 impl From<f64> for Value {
     fn from(v: f64) -> Self {
         Self::Number(v)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Self::String(Rc::new(RefCell::new(s.to_string())))
     }
 }
 
@@ -83,6 +94,8 @@ impl VM {
                 Instruction::Round => self.unary_op(|x| x.round())?,
                 Instruction::Floor => self.unary_op(|x| x.floor())?,
                 Instruction::Push(x) => self.push(*x),
+                Instruction::PushString(x) => self.push(x.as_str()),
+                Instruction::ConcatString => self.concat_str()?,
                 Instruction::LoadLocal(ident) => self.load_local(&ident),
                 Instruction::Assign(ident) => self.assign(ident)?,
                 Instruction::ShadowAssign(ident) => self.shadow_assign(ident)?,
@@ -111,6 +124,7 @@ impl VM {
                 Instruction::CmpLTE => self.binary_op(|lhs, rhs| (lhs <= rhs) as u8 as f64)?,
                 Instruction::CmpGT => self.binary_op(|lhs, rhs| (lhs > rhs) as u8 as f64)?,
                 Instruction::CmpGTE => self.binary_op(|lhs, rhs| (lhs >= rhs) as u8 as f64)?,
+                Instruction::NewString => self.stack.push(Value::String(Default::default())),
                 Instruction::Enter => self.scopes.push(),
                 Instruction::Leave => self.scopes.pop(),
             }
@@ -183,6 +197,23 @@ impl VM {
         });
 
         self.stack.push(x.into());
+    }
+
+    fn concat_str(&mut self) -> Result<(), String> {
+        let value = self.stack.pop();
+        let value = value.ok_or_else(|| String::from("missing assignment value"))?;
+        match (self.stack.pop(), &value) {
+            (Some(Value::String(s)), Value::String(value)) => {
+                s.borrow_mut().push_str(&value.borrow());
+            }
+            (Some(x), _) => {
+                eprintln!("WARN: current value is not concat-able '{x:?}'");
+            }
+            (None, _) => {
+                eprintln!("WARN: no current value to concat onto");
+            }
+        }
+        Ok(())
     }
 
     fn assign(&mut self, identifier: &str) -> Result<(), String> {

@@ -152,6 +152,11 @@ impl<'a, M: ChompMatcher<'a>> Chomp<M> {
         let map = consume.map(|(matched, bite)| (Some(matched), bite));
         map.unwrap_or((None, bite))
     }
+    pub fn consume_until(mut self, bite: Bite<'a>) -> (Option<&'a str>, Bite<'a>) {
+        let consume = self.matcher.consume(bite);
+        let map = consume.map(|(matched, bite)| (Some(matched), bite));
+        map.unwrap_or((None, bite))
+    }
     pub fn or<T>(self, other: Chomp<T>) -> Chomp<matchers::combine::Or<M, T>>
     where
         T: ChompMatcher<'a>,

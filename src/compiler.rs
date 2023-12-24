@@ -10,6 +10,7 @@ pub struct Compiler<'a> {
 pub(crate) enum RecursiveExpression {
     Block(Vec<RecursiveExpression>),
     Literal(f64),
+    LiteralString(String),
     Local(String),
     FuncDeclaration(Vec<String>, Box<RecursiveExpression>),
     If(Box<RecursiveExpression>, Box<RecursiveExpression>),
@@ -121,6 +122,7 @@ impl<'a> Compiler<'a> {
                     stream.push(Instruction::Leave);
                 }
                 RecursiveExpression::Literal(x) => stream.push(Instruction::Push(*x)),
+                RecursiveExpression::LiteralString(s) => stream.push(Instruction::PushString(s.clone())),
                 RecursiveExpression::Local(ident) => {
                     stream.push(Instruction::LoadLocal(ident.clone()))
                 }
@@ -229,6 +231,7 @@ impl<'a> Compiler<'a> {
             Some(Token::If) => self.parse_if_expression(),
             Some(Token::Pi | Token::E) => self.parse_const_expression(),
             Some(Token::LiteralNum(_)) => self.parse_literal_expression(),
+            Some(Token::DoubleQuotes) => self.parse_literal_string_expression(),
             Some(Token::Identifier(_)) => self.parse_var_expression(),
             _ => {
                 if let Some(_) = self.peek_func_0_op() {
@@ -250,6 +253,16 @@ impl<'a> Compiler<'a> {
         Some(RecursiveExpression::Literal(x))
     }
 
+    fn parse_literal_expression(&mut self) -> Option<RecursiveExpression> {
+        match *self.peek()? {
+            Token::LiteralNum(x) => {
+                self.consume();
+                Some(RecursiveExpression::Literal(x))
+            }
+            _ => None,
+        }
+    }
+    
     fn parse_literal_expression(&mut self) -> Option<RecursiveExpression> {
         match *self.peek()? {
             Token::LiteralNum(x) => {

@@ -36,6 +36,7 @@ pub enum Token {
     Sqrt,
     Comma,
     Semicolon,
+    DoubleQuotes,
     Eq,
     NotEq,
 }
@@ -128,6 +129,9 @@ fn tokenize_impl(bite: &mut parser::Bite<'_>, last_token: Option<&Token>) -> Res
         Token::Comma
     } else if let Some(_) = bite.nibble(parser::Chomp::char(';')) {
         Token::Semicolon
+    } else if let Some(_) = bite.nibble(parser::Chomp::char('"')) {
+        bite.nibble(chomp)
+        Token::DoubleQuotes
     } else if let Some(_) = bite.nibble(parser::Chomp::literal_substring("==")) {
         Token::Eq
     } else if let Some(_) = bite.nibble(parser::Chomp::literal_substring("!=")) {
