@@ -1,6 +1,6 @@
-ignore = ["public/tailwind.css"]
+ignore = ["web/public/tailwind.css"]
 
 [[hooks]]
 stage = "pre_build"
 command = "tailwindcss"
-command_arguments = ["-c", "tailwind.config.js", "-o", "public/tailwind.css"]
+command_arguments = ["-c", "web/tailwind.config.js", "-o", "web/public/tailwind.css"]

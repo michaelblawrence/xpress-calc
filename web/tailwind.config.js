@@ -2,10 +2,10 @@ module.exports = {
     purge: {
         mode: "all",
         content: [
-            "./src/**/*.rs",
-            "./index.html",
-            "./src/**/*.html",
-            "./src/**/*.css",
+            "./web/src/**/*.rs",
+            "./web/index.html",
+            "./web/src/**/*.html",
+            "./web/src/**/*.css",
         ],
     },
     theme: {},
